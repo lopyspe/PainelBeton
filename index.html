@@ -1,639 +1,575 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import { initializeApp } from 'firebase/app';
-import { 
-    getAuth, 
-    signInAnonymously, 
-    onAuthStateChanged
-} from 'firebase/auth';
-import { 
-    getFirestore, 
-    collection, 
-    doc, 
-    addDoc, 
-    setDoc,
-    getDoc,
-    onSnapshot, 
-    query,
-    updateDoc,
-    deleteDoc,
-    Timestamp,
-    writeBatch
-} from 'firebase/firestore';
-import { 
-    Home, 
-    Package, 
-    Users, 
-    ShoppingCart, 
-    PlusCircle, 
-    Edit, 
-    Trash2,
-    X,
-    Menu,
-    DollarSign,
-    ClipboardList,
-    CheckCircle,
-    AlertTriangle,
-    Sparkles // NOVO: Ícone para a funcionalidade de IA
-} from 'lucide-react';
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Painel de Aluguel de Ferramentas</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        .nav-button.active {
+            background-color: #2563eb; /* bg-blue-600 */
+            color: #ffffff;
+        }
+        .modal {
+            transition: opacity 0.3s ease;
+        }
+        .toast {
+            transition: transform 0.3s ease-in-out, opacity 0.3s ease-in-out;
+            transform: translateY(100%);
+            opacity: 0;
+        }
+        .toast.show {
+            transform: translateY(0);
+            opacity: 1;
+        }
+        /* Scrollbar customizada para webkit */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #1f2937; /* bg-gray-800 */
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #4b5563; /* bg-gray-600 */
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #6b7280; /* bg-gray-500 */
+        }
+    </style>
+</head>
+<body class="bg-gray-900 text-gray-300">
 
-// --- INÍCIO DA CONFIGURAÇÃO DO FIREBASE ---
-const firebaseConfig = {
-  apiKey: "AIzaSyDMylUG8IxttYiiMFMqlsb5jXkcAaOQ6bQ",
-  authDomain: "painelacailoja.firebaseapp.com",
-  projectId: "painelacailoja",
-  storageBucket: "painelacailoja.firebasestorage.app",
-  messagingSenderId: "1078717306556",
-  appId: "1:1078717306556:web:d77f600b11397f0cf3a2b9",
-  measurementId: "G-FG7P8K2YWH"
-};
-
-const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-rental-app';
-
-const app = initializeApp(firebaseConfig);
-const auth = getAuth(app);
-const db = getFirestore(app);
-// --- FIM DA CONFIGURAÇÃO DO FIREBASE ---
-
-// Componente para um Card de Estatística no Dashboard
-const StatCard = ({ title, value, icon, color }) => (
-    <div className="bg-white p-6 rounded-2xl shadow-lg flex items-center space-x-4 transition-transform hover:scale-105">
-        <div className={`p-3 rounded-full ${color}`}>
-            {icon}
-        </div>
-        <div>
-            <p className="text-sm text-gray-500 font-medium">{title}</p>
-            <p className="text-2xl font-bold text-gray-800">{value}</p>
-        </div>
-    </div>
-);
-
-// Componente para o Modal genérico
-const Modal = ({ isOpen, onClose, title, children }) => {
-    if (!isOpen) return null;
-
-    return (
-        <div className="fixed inset-0 bg-black bg-opacity-60 z-50 flex justify-center items-center p-4">
-            <div className="bg-gray-50 rounded-2xl shadow-2xl w-full max-w-md m-4" role="dialog" aria-modal="true" aria-labelledby="modal-title">
-                <div className="flex justify-between items-center p-5 border-b border-gray-200">
-                    <h3 id="modal-title" className="text-xl font-bold text-gray-800">{title}</h3>
-                    <button onClick={onClose} className="text-gray-400 hover:text-gray-600 transition-colors">
-                        <X size={28} />
-                    </button>
-                </div>
-                <div className="p-6">
-                    {children}
-                </div>
+    <div class="flex h-screen">
+        <!-- Navegação Lateral -->
+        <aside class="w-64 bg-gray-800 p-4 flex flex-col">
+            <div class="flex items-center mb-8">
+                <i class="fa-solid fa-helmet-safety text-3xl text-blue-500 mr-3"></i>
+                <h1 class="text-xl font-bold text-white">RentalSys</h1>
             </div>
-        </div>
-    );
-};
-
-const AlertModal = ({ isOpen, onClose, title, message }) => (
-    <Modal isOpen={isOpen} onClose={onClose} title={title || "Aviso"}>
-        <p className="text-gray-600 mb-6">{message}</p>
-        <div className="flex justify-end">
-            <button onClick={onClose} className="bg-blue-600 text-white font-bold py-2 px-6 rounded-lg hover:bg-blue-700 transition-colors">
-                OK
-            </button>
-        </div>
-    </Modal>
-);
-
-const ConfirmModal = ({ isOpen, onClose, onConfirm, text }) => (
-     <Modal isOpen={isOpen} onClose={onClose} title="Confirmação">
-        <p className="text-gray-600 mb-6">{text}</p>
-        <div className="flex justify-end space-x-4">
-            <button onClick={onClose} className="bg-gray-200 text-gray-800 font-bold py-2 px-6 rounded-lg hover:bg-gray-300 transition-colors">
-                Cancelar
-            </button>
-            <button onClick={onConfirm} className="bg-red-600 text-white font-bold py-2 px-6 rounded-lg hover:bg-red-700 transition-colors">
-                Confirmar
-            </button>
-        </div>
-    </Modal>
-);
-
-
-// Componente principal da Aplicação
-export default function App() {
-    const [userId, setUserId] = useState(null);
-    const [isAuthReady, setIsAuthReady] = useState(false);
-    
-    const [products, setProducts] = useState([]);
-    const [clients, setClients] = useState([]);
-    const [rentals, setRentals] = useState([]);
-
-    const [currentView, setCurrentView] = useState('dashboard');
-    const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-
-    const [isProductModalOpen, setIsProductModalOpen] = useState(false);
-    const [isClientModalOpen, setIsClientModalOpen] = useState(false);
-    const [isRentalModalOpen, setIsRentalModalOpen] = useState(false);
-    const [editingItem, setEditingItem] = useState(null);
-
-    const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
-    const [confirmModalProps, setConfirmModalProps] = useState({ onConfirm: () => {}, text: '' });
-    const [isAlertModalOpen, setIsAlertModalOpen] = useState(false);
-    const [alertMessage, setAlertMessage] = useState('');
-
-    // --- NOVO: Estados para a funcionalidade de IA ---
-    const [aiPrompt, setAiPrompt] = useState('');
-    const [aiResponse, setAiResponse] = useState('');
-    const [isGenerating, setIsGenerating] = useState(false);
-
-    useEffect(() => {
-        const unsubscribe = onAuthStateChanged(auth, (user) => {
-            if (user) {
-                setUserId(user.uid);
-                setIsAuthReady(true);
-            } else {
-                signInAnonymously(auth).catch(err => {
-                     console.error("Erro na autenticação anônima:", err);
-                     setIsAuthReady(true);
-                });
-            }
-        });
-        return () => unsubscribe();
-    }, []);
-
-    useEffect(() => {
-        if (!isAuthReady || !userId) return;
-        const collections = { products: setProducts, clients: setClients, rentals: setRentals };
-        const unsubscribers = Object.entries(collections).map(([name, setter]) => {
-            const collectionRef = collection(db, 'artifacts', appId, 'users', userId, name);
-            const q = query(collectionRef);
-            return onSnapshot(q, (querySnapshot) => {
-                const items = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                if (name === 'rentals') {
-                    items.forEach(item => {
-                        if (item.startDate instanceof Timestamp) item.startDate = item.startDate.toDate();
-                        if (item.endDate instanceof Timestamp) item.endDate = item.endDate.toDate();
-                    });
-                }
-                setter(items);
-            }, (error) => console.error(`Erro ao carregar ${name}:`, error));
-        });
-        return () => unsubscribers.forEach(unsub => unsub());
-    }, [isAuthReady, userId]);
-    
-    // --- LÓGICA DE NEGÓCIO E MANIPULADORES DE EVENTOS ---
-    
-    const closeAllModals = () => {
-        setIsClientModalOpen(false);
-        setIsProductModalOpen(false);
-        setIsRentalModalOpen(false);
-        setEditingItem(null);
-    };
-    
-    const closeConfirmModal = () => {
-        setIsConfirmModalOpen(false);
-        setConfirmModalProps({ onConfirm: () => {}, text: '' });
-    };
-
-    const handleClientSubmit = async (formData) => {
-        if (!isAuthReady || !userId) return;
-        try {
-            const collectionRef = collection(db, 'artifacts', appId, 'users', userId, 'clients');
-            if (editingItem) {
-                await setDoc(doc(db, collectionRef.path, editingItem.id), formData);
-            } else {
-                await addDoc(collectionRef, formData);
-            }
-            closeAllModals();
-        } catch (error) { console.error("Erro ao salvar cliente:", error); }
-    };
-
-    const handleProductSubmit = async (formData) => {
-        if (!isAuthReady || !userId) return;
-        const dataToSave = {
-            ...formData,
-            dailyRate: parseFloat(formData.dailyRate) || 0,
-            totalQuantity: parseInt(formData.totalQuantity) || 0,
-        };
-        if (!editingItem) {
-            dataToSave.availableQuantity = dataToSave.totalQuantity;
-        } else {
-            const rentedCount = rentals.filter(r => r.productId === editingItem.id && r.status === 'active').length;
-            dataToSave.availableQuantity = dataToSave.totalQuantity - rentedCount;
-        }
-        try {
-            const collectionRef = collection(db, 'artifacts', appId, 'users',userId, 'products');
-            if (editingItem) {
-                await setDoc(doc(db, collectionRef.path, editingItem.id), dataToSave);
-            } else {
-                await addDoc(collectionRef, dataToSave);
-            }
-            closeAllModals();
-        } catch (error) { console.error("Erro ao salvar produto:", error); }
-    };
-
-    const handleRentalSubmit = async (formData) => {
-        if (!isAuthReady || !userId) return;
-        const product = products.find(p => p.id === formData.productId);
-        if (!product || product.availableQuantity <= 0) {
-            setAlertMessage("Produto não disponível ou com estoque esgotado para aluguel.");
-            setIsAlertModalOpen(true);
-            return;
-        }
-        const client = clients.find(c => c.id === formData.clientId);
-        const dataToSave = { ...formData, productName: product.name, clientName: client.name, startDate: Timestamp.fromDate(new Date(formData.startDate)), endDate: null, status: 'active', dailyRate: product.dailyRate };
-        const batch = writeBatch(db);
-        const rentalRef = doc(collection(db, 'artifacts', appId, 'users', userId, 'rentals'));
-        batch.set(rentalRef, dataToSave);
-        const productRef = doc(db, 'artifacts', appId, 'users', userId, 'products', product.id);
-        batch.update(productRef, { availableQuantity: product.availableQuantity - 1 });
-        try {
-            await batch.commit();
-            closeAllModals();
-        } catch (error) { console.error("Erro ao criar aluguel:", error); }
-    };
-
-    const handleCompleteRental = async (rentalId) => {
-        if (!isAuthReady || !userId) return;
-        const rental = rentals.find(r => r.id === rentalId);
-        if (!rental) return;
-        const batch = writeBatch(db);
-        const rentalRef = doc(db, 'artifacts', appId, 'users', userId, 'rentals', rentalId);
-        batch.update(rentalRef, { status: 'completed', endDate: Timestamp.now() });
-        const productRef = doc(db, 'artifacts', appId, 'users', userId, 'products', rental.productId);
-        const productDoc = await getDoc(productRef);
-        if (productDoc.exists()) {
-             batch.update(productRef, { availableQuantity: productDoc.data().availableQuantity + 1 });
-        }
-        try { await batch.commit(); } catch (error) { console.error("Erro ao completar aluguel:", error); }
-    };
-    
-    const handleDelete = (collectionName, id) => {
-        if (collectionName === 'products' && rentals.some(r => r.productId === id && r.status === 'active')) {
-            setAlertMessage("Não é possível excluir um produto com aluguéis ativos.");
-            setIsAlertModalOpen(true);
-            return;
-        }
-        if (collectionName === 'clients' && rentals.some(r => r.clientId === id && r.status === 'active')) {
-            setAlertMessage("Não é possível excluir um cliente com aluguéis ativos.");
-            setIsAlertModalOpen(true);
-            return;
-        }
-        const performDelete = async () => {
-            if (!isAuthReady || !userId) return;
-            try {
-                await deleteDoc(doc(db, 'artifacts', appId, 'users', userId, collectionName, id));
-            } catch (error) { console.error(`Erro ao excluir item de ${collectionName}:`, error); }
-            closeConfirmModal();
-        };
-        setConfirmModalProps({ onConfirm: performDelete, text: 'Tem certeza que deseja excluir este item? Esta ação não pode ser desfeita.' });
-        setIsConfirmModalOpen(true);
-    };
-
-    const handleDeleteRental = (rentalId) => {
-        const performDelete = async () => {
-            if (!isAuthReady || !userId) return;
-            const rental = rentals.find(r => r.id === rentalId);
-            if (!rental) { console.error("Aluguel não encontrado."); closeConfirmModal(); return; }
-            try {
-                if (rental.status === 'active') {
-                    const batch = writeBatch(db);
-                    const rentalRef = doc(db, 'artifacts', appId, 'users', userId, 'rentals', rentalId);
-                    batch.delete(rentalRef);
-                    const productRef = doc(db, 'artifacts', appId, 'users', userId, 'products', rental.productId);
-                    const productDoc = await getDoc(productRef);
-                    if (productDoc.exists()) {
-                        batch.update(productRef, { availableQuantity: productDoc.data().availableQuantity + 1 });
-                    }
-                    await batch.commit();
-                } else {
-                    await deleteDoc(doc(db, 'artifacts', appId, 'users', userId, 'rentals', rentalId));
-                }
-            } catch (error) { console.error("Erro ao excluir aluguel:", error); }
-            closeConfirmModal();
-        };
-        setConfirmModalProps({ onConfirm: performDelete, text: 'Tem certeza que deseja excluir este aluguel? Esta ação não pode ser desfeita.' });
-        setIsConfirmModalOpen(true);
-    };
-
-    const openModal = (type, item = null) => {
-        setEditingItem(item);
-        if (type === 'client') setIsClientModalOpen(true);
-        if (type === 'product') setIsProductModalOpen(true);
-        if (type === 'rental') setIsRentalModalOpen(true);
-    };
-
-    // --- NOVO: Lógica para a API Gemini ---
-    const handleGenerateAnalysis = async () => {
-        if (!aiPrompt.trim()) {
-            setAlertMessage("Por favor, digite uma pergunta para a análise.");
-            setIsAlertModalOpen(true);
-            return;
-        }
-
-        setIsGenerating(true);
-        setAiResponse('');
-
-        // Constrói o prompt detalhado para a IA
-        const fullPrompt = `
-            Você é um assistente de análise de negócios para uma empresa de aluguel de equipamentos.
-            Analise os seguintes dados e responda à pergunta do usuário.
-
-            **Dados de Produtos:**
-            ${JSON.stringify(products, null, 2)}
-
-            **Dados de Clientes:**
-            ${JSON.stringify(clients, null, 2)}
-
-            **Dados de Aluguéis:**
-            ${JSON.stringify(rentals, null, 2)}
-
-            **Pergunta do Usuário:**
-            "${aiPrompt}"
-
-            Responda em português, de forma clara e objetiva. Se a pergunta for sobre o item mais alugado ou lucrativo, inclua o nome do item e os números.
-        `;
-
-        const apiKey = ""; // A API Key é gerenciada pelo ambiente
-        const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${apiKey}`;
-
-        try {
-            const response = await fetch(apiUrl, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ contents: [{ parts: [{ text: fullPrompt }] }] })
-            });
-
-            if (!response.ok) {
-                throw new Error(`Erro na API: ${response.statusText}`);
-            }
-
-            const result = await response.json();
-            
-            if (result.candidates && result.candidates.length > 0 && result.candidates[0].content.parts.length > 0) {
-                const text = result.candidates[0].content.parts[0].text;
-                setAiResponse(text);
-            } else {
-                throw new Error("A resposta da API está vazia ou em formato inesperado.");
-            }
-
-        } catch (error) {
-            console.error("Erro ao chamar a API Gemini:", error);
-            setAiResponse(`Ocorreu um erro ao gerar a análise: ${error.message}`);
-        } finally {
-            setIsGenerating(false);
-        }
-    };
-
-    // --- COMPONENTES DE VISUALIZAÇÃO (VIEWS) ---
-    const DashboardView = () => {
-        const stats = useMemo(() => {
-            const activeRentals = rentals.filter(r => r.status === 'active');
-            const completedRentals = rentals.filter(r => r.status === 'completed');
-            const totalRevenue = completedRentals.reduce((acc, rental) => {
-                const days = Math.max(1, Math.ceil(((rental.endDate || new Date()) - rental.startDate) / (1000 * 60 * 60 * 24)));
-                return acc + (days * rental.dailyRate);
-            }, 0);
-            return {
-                totalRentals: rentals.length,
-                activeRentals: activeRentals.length,
-                totalRevenue: totalRevenue.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }),
-            };
-        }, [rentals]);
-        return (
-            <div>
-                <h2 className="text-3xl font-bold text-gray-800 mb-8">Dashboard</h2>
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
-                    <StatCard title="Total de Aluguéis" value={stats.totalRentals} icon={<ClipboardList className="text-white" size={24}/>} color="bg-blue-500" />
-                    <StatCard title="Aluguéis Ativos" value={stats.activeRentals} icon={<ShoppingCart className="text-white" size={24}/>} color="bg-green-500" />
-                    <StatCard title="Faturamento (Concluídos)" value={stats.totalRevenue} icon={<DollarSign className="text-white" size={24}/>} color="bg-yellow-500" />
-                </div>
-            </div>
-        );
-    };
-
-    const GenericListView = ({ title, data, columns, onAdd, onEdit, onDelete, collectionName }) => (
-        <div>
-            <div className="flex justify-between items-center mb-8">
-                <h2 className="text-3xl font-bold text-gray-800">{title}</h2>
-                <button onClick={onAdd} className="bg-blue-600 text-white font-bold py-2 px-4 rounded-lg flex items-center space-x-2 hover:bg-blue-700 transition-colors shadow-md">
-                    <PlusCircle size={20} /><span>Adicionar</span>
+            <nav class="flex flex-col space-y-2">
+                <button onclick="switchTab('rentals')" class="nav-button active flex items-center p-3 rounded-lg text-left text-gray-300 hover:bg-gray-700 transition-colors">
+                    <i class="fa-solid fa-calendar-days w-6 mr-3"></i>Aluguéis Ativos
                 </button>
+                <button onclick="switchTab('history')" class="nav-button flex items-center p-3 rounded-lg text-left text-gray-300 hover:bg-gray-700 transition-colors">
+                    <i class="fa-solid fa-history w-6 mr-3"></i>Histórico
+                </button>
+                <button onclick="switchTab('clients')" class="nav-button flex items-center p-3 rounded-lg text-left text-gray-300 hover:bg-gray-700 transition-colors">
+                    <i class="fa-solid fa-users w-6 mr-3"></i>Clientes
+                </button>
+                <button onclick="switchTab('tools')" class="nav-button flex items-center p-3 rounded-lg text-left text-gray-300 hover:bg-gray-700 transition-colors">
+                    <i class="fa-solid fa-screwdriver-wrench w-6 mr-3"></i>Ferramentas
+                </button>
+            </nav>
+            <div class="mt-auto text-center text-xs text-gray-500">
+                <p>Painel de Gerenciamento v2.2</p>
+                <p class="mt-1 truncate">ID: <span id="user-id-display">Carregando...</span></p>
             </div>
-            <div className="bg-white rounded-2xl shadow-lg overflow-hidden">
-                <div className="overflow-x-auto">
-                    <table className="w-full text-left">
-                        <thead>
-                            <tr className="bg-gray-50 border-b-2 border-gray-100">
-                                {columns.map(col => <th key={col.key} className="p-4 font-semibold text-gray-600 uppercase text-sm">{col.label}</th>)}
-                                <th className="p-4 font-semibold text-gray-600 uppercase text-sm">Ações</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {data.map(item => (
-                                <tr key={item.id} className="border-b border-gray-100 hover:bg-gray-50">
-                                    {columns.map(col => <td key={col.key} className="p-4 text-gray-800">{item[col.key]}</td>)}
-                                    <td className="p-4 flex items-center space-x-2">
-                                        <button onClick={() => onEdit(item)} className="p-2 text-gray-500 hover:text-blue-600 hover:bg-blue-100 rounded-full"><Edit size={18}/></button>
-                                        <button onClick={() => onDelete(collectionName, item.id)} className="p-2 text-gray-500 hover:text-red-600 hover:bg-red-100 rounded-full"><Trash2 size={18}/></button>
-                                    </td>
-                                </tr>
-                            ))}
-                             {data.length === 0 && ( <tr><td colSpan={columns.length + 1} className="text-center p-6 text-gray-500">Nenhum item encontrado.</td></tr> )}
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-        </div>
-    );
-    
-    const RentalsView = () => {
-        const activeRentals = rentals.filter(r => r.status === 'active');
-        const completedRentals = rentals.filter(r => r.status === 'completed');
-        return (
-            <div>
-                 <div className="flex justify-between items-center mb-8">
-                    <h2 className="text-3xl font-bold text-gray-800">Gerenciar Aluguéis</h2>
-                    <button onClick={() => openModal('rental')} className="bg-blue-600 text-white font-bold py-2 px-4 rounded-lg flex items-center space-x-2 hover:bg-blue-700 transition-colors shadow-md">
-                        <PlusCircle size={20} /><span>Novo Aluguel</span>
-                    </button>
-                </div>
-                <div className="bg-white p-6 rounded-2xl shadow-lg mb-8">
-                     <h3 className="text-xl font-bold text-gray-800 mb-4 flex items-center"><ShoppingCart size={22} className="mr-2 text-green-500"/> Aluguéis Ativos</h3>
-                     <div className="overflow-x-auto">
-                        <table className="w-full text-left">
-                           <thead>
-                                <tr className="border-b-2 border-gray-100">
-                                    <th className="p-3 font-semibold text-gray-600">Produto</th><th className="p-3 font-semibold text-gray-600">Cliente</th><th className="p-3 font-semibold text-gray-600">Data de Início</th><th className="p-3 font-semibold text-gray-600">Diária</th><th className="p-3 font-semibold text-gray-600">Ações</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {activeRentals.map(rental => (
-                                    <tr key={rental.id} className="border-b border-gray-100 hover:bg-gray-50">
-                                        <td className="p-3">{rental.productName}</td><td className="p-3">{rental.clientName}</td><td className="p-3">{rental.startDate.toLocaleDateString('pt-BR')}</td><td className="p-3">{rental.dailyRate.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</td>
-                                        <td className="p-3">
-                                            <div className="flex items-center space-x-2">
-                                                <button onClick={() => handleCompleteRental(rental.id)} className="bg-green-100 text-green-700 px-3 py-1 rounded-full text-sm font-semibold hover:bg-green-200 flex items-center space-x-1"><CheckCircle size={16}/><span>Concluir</span></button>
-                                                <button onClick={() => handleDeleteRental(rental.id)} className="p-2 text-gray-500 hover:text-red-600 hover:bg-red-100 rounded-full" title="Excluir Aluguel"><Trash2 size={18}/></button>
-                                            </div>
-                                        </td>
-                                    </tr>
-                                ))}
-                                {activeRentals.length === 0 && (<tr><td colSpan="5" className="text-center p-4 text-gray-500">Nenhum aluguel ativo.</td></tr>)}
-                            </tbody>
-                        </table>
-                     </div>
-                </div>
-                 <div className="bg-white p-6 rounded-2xl shadow-lg">
-                     <h3 className="text-xl font-bold text-gray-800 mb-4 flex items-center"><CheckCircle size={22} className="mr-2 text-blue-500"/> Histórico de Concluídos</h3>
-                     <div className="overflow-x-auto">
-                        <table className="w-full text-left">
-                           <thead>
-                                <tr className="border-b-2 border-gray-100">
-                                    <th className="p-3 font-semibold text-gray-600">Produto</th><th className="p-3 font-semibold text-gray-600">Cliente</th><th className="p-3 font-semibold text-gray-600">Período</th><th className="p-3 font-semibold text-gray-600">Ações</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {completedRentals.map(rental => (
-                                    <tr key={rental.id} className="border-b border-gray-100 hover:bg-gray-50">
-                                        <td className="p-3">{rental.productName}</td><td className="p-3">{rental.clientName}</td><td className="p-3">{`${rental.startDate.toLocaleDateString('pt-BR')} - ${rental.endDate ? rental.endDate.toLocaleDateString('pt-BR') : '...'}`}</td>
-                                        <td className="p-3">
-                                            <button onClick={() => handleDeleteRental(rental.id)} className="p-2 text-gray-500 hover:text-red-600 hover:bg-red-100 rounded-full" title="Excluir Histórico"><Trash2 size={18}/></button>
-                                        </td>
-                                    </tr>
-                                ))}
-                                {completedRentals.length === 0 && (<tr><td colSpan="4" className="text-center p-4 text-gray-500">Nenhum aluguel concluído.</td></tr>)}
-                            </tbody>
-                        </table>
-                     </div>
-                </div>
-            </div>
-        )
-    }
+        </aside>
 
-    // --- NOVO: Componente para a tela de Análise com IA ---
-    const AIAnalysisView = () => (
-        <div>
-            <h2 className="text-3xl font-bold text-gray-800 mb-4">Análise com IA</h2>
-            <p className="text-gray-600 mb-8">Faça uma pergunta em linguagem natural sobre seus dados de aluguel. A IA irá analisar e fornecer insights para você.</p>
-            
-            <div className="bg-white p-6 rounded-2xl shadow-lg">
-                <div className="space-y-4">
-                    <label htmlFor="ai-prompt" className="block text-sm font-medium text-gray-700">Sua pergunta:</label>
-                    <textarea
-                        id="ai-prompt"
-                        rows="3"
-                        value={aiPrompt}
-                        onChange={(e) => setAiPrompt(e.target.value)}
-                        className="w-full p-3 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500"
-                        placeholder="Ex: Qual foi o produto mais alugado? Quem são meus 3 melhores clientes em faturamento?"
-                    />
-                    <button
-                        onClick={handleGenerateAnalysis}
-                        disabled={isGenerating}
-                        className="w-full bg-blue-600 text-white font-bold py-3 px-4 rounded-lg flex items-center justify-center space-x-2 hover:bg-blue-700 transition-colors shadow-md disabled:bg-blue-400 disabled:cursor-not-allowed"
-                    >
-                        {isGenerating ? (
-                            <>
-                                <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
-                                <span>Gerando...</span>
-                            </>
-                        ) : (
-                            <>
-                                <Sparkles size={20} />
-                                <span>Gerar Análise</span>
-                            </>
-                        )}
-                    </button>
+        <!-- Conteúdo Principal -->
+        <div class="flex-1 flex flex-col overflow-y-auto">
+            <main class="p-6 md:p-8 lg:p-10">
+                <!-- Aba de Aluguéis -->
+                <div id="rentals-tab" class="space-y-6">
+                    <div class="flex justify-between items-center">
+                        <h2 class="text-3xl font-bold text-white">Acompanhamento de Aluguéis</h2>
+                        <button id="new-rental-btn" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg shadow-md transition duration-300 flex items-center">
+                            <i class="fa-solid fa-plus mr-2"></i>Novo Aluguel
+                        </button>
+                    </div>
+                    <div id="rentals-list" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                        <!-- Cards de aluguel serão inseridos aqui -->
+                         <p id="no-rentals-message" class="text-gray-400 col-span-full">Nenhum aluguel ativo no momento. Clique em "Novo Aluguel" para começar.</p>
+                    </div>
                 </div>
-
-                {aiResponse && (
-                    <div className="mt-8 pt-6 border-t border-gray-200">
-                        <h3 className="text-xl font-bold text-gray-800 mb-4">Resultado da Análise:</h3>
-                        <div className="bg-gray-100 p-4 rounded-lg whitespace-pre-wrap text-gray-700">
-                            {aiResponse}
+                
+                <!-- Aba de Histórico -->
+                <div id="history-tab" class="hidden space-y-6">
+                    <h2 class="text-3xl font-bold text-white mb-6">Histórico de Aluguéis</h2>
+                    <div class="bg-gray-800 p-6 rounded-lg shadow-lg border border-gray-700">
+                        <div id="history-list" class="divide-y divide-gray-700">
+                             <!-- Lista do histórico será inserida aqui -->
+                            <p id="no-history-message" class="text-gray-400 py-4">Nenhum aluguel finalizado no histórico.</p>
                         </div>
                     </div>
-                )}
-            </div>
-        </div>
-    );
+                </div>
 
-    const Form = ({ fields, onSubmit, initialData, onCancel }) => {
-        const [formData, setFormData] = useState({});
-        useEffect(() => { setFormData(initialData || fields.reduce((acc, field) => ({...acc, [field.name]: ''}), {})); }, [initialData, fields]);
-        const handleChange = (e) => { setFormData(prev => ({ ...prev, [e.target.name]: e.target.value })); };
-        const handleSubmit = (e) => { e.preventDefault(); onSubmit(formData); };
-        return (
-            <form onSubmit={handleSubmit} className="space-y-6">
-                {fields.map(field => (
-                    <div key={field.name}>
-                        <label htmlFor={field.name} className="block text-sm font-medium text-gray-700 mb-1">{field.label}</label>
-                        {field.type === 'select' ? (
-                             <select id={field.name} name={field.name} value={formData[field.name] || ''} onChange={handleChange} required className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500">
-                                <option value="" disabled>Selecione...</option>
-                                {field.options.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
-                            </select>
-                        ) : (
-                            <input type={field.type} id={field.name} name={field.name} value={formData[field.name] || ''} onChange={handleChange} placeholder={field.placeholder} required className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500" />
-                        )}
+                <!-- Aba de Clientes -->
+                <div id="clients-tab" class="hidden space-y-6">
+                    <h2 class="text-3xl font-bold text-white mb-6">Gerenciar Clientes</h2>
+                    <div class="bg-gray-800 p-6 rounded-lg shadow-lg border border-gray-700">
+                        <h3 class="text-2xl font-semibold mb-4 text-white">Cadastrar Novo Cliente</h3>
+                        <form id="add-client-form" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <input type="text" id="client-name" placeholder="Nome do Cliente" class="p-3 bg-gray-700 border border-gray-600 rounded-md w-full text-white placeholder-gray-400 focus:ring-blue-500 focus:border-blue-500" required>
+                            <input type="text" id="client-phone" placeholder="Telefone" class="p-3 bg-gray-700 border border-gray-600 rounded-md w-full text-white placeholder-gray-400 focus:ring-blue-500 focus:border-blue-500">
+                            <button type="submit" class="md:col-span-2 bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-4 rounded-lg shadow-md transition duration-300 flex items-center justify-center">
+                                <i class="fa-solid fa-user-plus mr-2"></i>Salvar Cliente
+                            </button>
+                        </form>
                     </div>
-                ))}
-                <div className="flex justify-end space-x-4 pt-4">
-                    <button type="button" onClick={onCancel} className="bg-gray-200 text-gray-800 font-bold py-2 px-6 rounded-lg hover:bg-gray-300">Cancelar</button>
-                    <button type="submit" className="bg-blue-600 text-white font-bold py-2 px-6 rounded-lg hover:bg-blue-700 shadow-md">Salvar</button>
+                     <div class="bg-gray-800 p-6 rounded-lg shadow-lg border border-gray-700">
+                        <h3 class="text-2xl font-semibold mb-4 text-white">Clientes Cadastrados</h3>
+                        <div id="clients-list" class="divide-y divide-gray-700">
+                            <!-- Lista de clientes será inserida aqui -->
+                            <p id="no-clients-message" class="text-gray-400 py-4">Nenhum cliente cadastrado.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Aba de Ferramentas -->
+                <div id="tools-tab" class="hidden space-y-6">
+                    <h2 class="text-3xl font-bold text-white mb-6">Gerenciar Ferramentas</h2>
+                     <div class="bg-gray-800 p-6 rounded-lg shadow-lg border border-gray-700">
+                        <h3 class="text-2xl font-semibold mb-4 text-white">Cadastrar Nova Ferramenta</h3>
+                        <form id="add-tool-form" class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <input type="text" id="tool-name" placeholder="Nome da Ferramenta (ex: Betoneira 400L)" class="p-3 bg-gray-700 border border-gray-600 rounded-md w-full md:col-span-2 text-white placeholder-gray-400 focus:ring-blue-500 focus:border-blue-500" required>
+                            <input type="number" id="tool-rate" placeholder="Valor da Diária (R$)" class="p-3 bg-gray-700 border border-gray-600 rounded-md w-full text-white placeholder-gray-400 focus:ring-blue-500 focus:border-blue-500" step="0.01" required>
+                            <button type="submit" class="md:col-span-3 bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-4 rounded-lg shadow-md transition duration-300 flex items-center justify-center">
+                                <i class="fa-solid fa-plus-circle mr-2"></i>Salvar Ferramenta
+                            </button>
+                        </form>
+                    </div>
+                     <div class="bg-gray-800 p-6 rounded-lg shadow-lg border border-gray-700">
+                        <h3 class="text-2xl font-semibold mb-4 text-white">Ferramentas Cadastradas</h3>
+                        <div id="tools-list" class="divide-y divide-gray-700">
+                            <!-- Lista de ferramentas será inserida aqui -->
+                            <p id="no-tools-message" class="text-gray-400 py-4">Nenhuma ferramenta cadastrada.</p>
+                        </div>
+                    </div>
+                </div>
+            </main>
+        </div>
+    </div>
+
+    <!-- Modal de Novo Aluguel -->
+    <div id="rental-modal" class="modal fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center p-4 hidden pointer-events-none opacity-0">
+        <div class="bg-gray-800 border border-gray-700 rounded-lg shadow-2xl p-6 md:p-8 w-full max-w-lg transform scale-95 transition-transform duration-300">
+            <h2 class="text-2xl font-bold mb-6 text-white">Registrar Novo Aluguel</h2>
+            <form id="add-rental-form">
+                <div class="space-y-4">
+                    <div>
+                        <label for="rental-client" class="block text-sm font-medium text-gray-400 mb-1">Cliente</label>
+                        <select id="rental-client" class="w-full p-3 bg-gray-700 border border-gray-600 rounded-md text-white focus:ring-blue-500 focus:border-blue-500" required></select>
+                    </div>
+                    <div>
+                        <label for="rental-tool" class="block text-sm font-medium text-gray-400 mb-1">Ferramenta</label>
+                        <select id="rental-tool" class="w-full p-3 bg-gray-700 border border-gray-600 rounded-md text-white focus:ring-blue-500 focus:border-blue-500" required></select>
+                    </div>
+                    <div>
+                        <label for="rental-date" class="block text-sm font-medium text-gray-400 mb-1">Data de Início</label>
+                        <input type="date" id="rental-date" class="w-full p-3 bg-gray-700 border border-gray-600 rounded-md text-white" required style="color-scheme: dark;">
+                    </div>
+                </div>
+                <div class="mt-8 flex justify-end space-x-4">
+                    <button type="button" id="cancel-rental-btn" class="bg-gray-600 hover:bg-gray-500 text-white font-bold py-2 px-4 rounded-lg transition duration-300">Cancelar</button>
+                    <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg shadow-md transition duration-300">Registrar Aluguel</button>
                 </div>
             </form>
-        );
-    };
-
-    const renderView = () => {
-        switch (currentView) {
-            case 'products': return <GenericListView title="Produtos / Equipamentos" data={products} columns={[{ key: 'name', label: 'Nome' }, { key: 'dailyRate', label: 'Diária (R$)' }, { key: 'totalQuantity', label: 'Qtd. Total' }, { key: 'availableQuantity', label: 'Qtd. Disp.' }]} onAdd={() => openModal('product')} onEdit={(item) => openModal('product', item)} onDelete={handleDelete} collectionName="products" />;
-            case 'clients': return <GenericListView title="Clientes" data={clients} columns={[{ key: 'name', label: 'Nome' }, { key: 'phone', label: 'Telefone' }, { key: 'address', label: 'Endereço' }]} onAdd={() => openModal('client')} onEdit={(item) => openModal('client', item)} onDelete={handleDelete} collectionName="clients" />;
-            case 'rentals': return <RentalsView />;
-            case 'ai-analysis': return <AIAnalysisView />; // NOVO: Renderiza a tela de IA
-            default: return <DashboardView />;
-        }
-    };
-    
-    const NavItem = ({ icon, label, viewName }) => (
-        <li className="mb-2">
-            <button onClick={() => { setCurrentView(viewName); if (isSidebarOpen) setIsSidebarOpen(false); }} className={`w-full flex items-center p-3 rounded-lg transition-colors text-lg ${currentView === viewName ? 'bg-blue-600 text-white shadow-md' : 'text-gray-300 hover:bg-gray-700 hover:text-white'}`}>
-                {icon}<span className="ml-4">{label}</span>
-            </button>
-        </li>
-    );
-
-    if (!isAuthReady) {
-        return <div className="flex justify-center items-center h-screen bg-gray-900 text-white">Carregando Painel...</div>;
-    }
-
-    return (
-        <div className="flex h-screen bg-gray-100 font-sans">
-            <aside className={`bg-gray-800 text-white fixed lg:static inset-y-0 left-0 z-30 w-64 transform ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'} lg:translate-x-0 transition-transform duration-300 ease-in-out shadow-2xl`}>
-                <div className="p-6 flex items-center justify-between"><h1 className="text-2xl font-bold text-white">RentalSys</h1><button onClick={() => setIsSidebarOpen(false)} className="lg:hidden text-gray-400 hover:text-white"><X size={24} /></button></div>
-                <nav className="p-4">
-                    <ul>
-                        <NavItem icon={<Home size={22} />} label="Dashboard" viewName="dashboard" />
-                        <NavItem icon={<Package size={22} />} label="Produtos" viewName="products" />
-                        <NavItem icon={<Users size={22} />} label="Clientes" viewName="clients" />
-                        <NavItem icon={<ShoppingCart size={22} />} label="Aluguéis" viewName="rentals" />
-                        {/* NOVO: Item de menu para a Análise com IA */}
-                        <NavItem icon={<Sparkles size={22} />} label="Análise com IA" viewName="ai-analysis" />
-                    </ul>
-                </nav>
-                 <div className="absolute bottom-4 left-4 right-4 p-2 text-xs text-gray-400 break-words"><p className="font-semibold">ID do Usuário:</p><p className="text-gray-500">{userId}</p></div>
-            </aside>
-
-            <main className="flex-1 flex flex-col overflow-y-auto">
-                <header className="bg-white shadow-sm p-4 flex justify-between items-center lg:hidden"><h1 className="text-xl font-bold text-gray-800 capitalize">{currentView.replace('-', ' ')}</h1><button onClick={() => setIsSidebarOpen(true)} className="text-gray-600"><Menu size={28} /></button></header>
-                <div className="p-6 md:p-8 flex-1">{renderView()}</div>
-            </main>
-
-            {/* Modais de Formulário */}
-            <Modal isOpen={isClientModalOpen} onClose={closeAllModals} title={editingItem ? 'Editar Cliente' : 'Novo Cliente'}><Form initialData={editingItem} onSubmit={handleClientSubmit} onCancel={closeAllModals} fields={[{ name: 'name', label: 'Nome Completo', type: 'text', placeholder: 'João da Silva' }, { name: 'phone', label: 'Telefone', type: 'tel', placeholder: '(11) 99999-8888' }, { name: 'address', label: 'Endereço', type: 'text', placeholder: 'Rua das Flores, 123' }]} /></Modal>
-            <Modal isOpen={isProductModalOpen} onClose={closeAllModals} title={editingItem ? 'Editar Produto' : 'Novo Produto'}><Form initialData={editingItem} onSubmit={handleProductSubmit} onCancel={closeAllModals} fields={[{ name: 'name', label: 'Nome do Produto', type: 'text', placeholder: 'Betoneira 400L' }, { name: 'dailyRate', label: 'Valor da Diária (R$)', type: 'number', placeholder: '100.00' }, { name: 'totalQuantity', label: 'Quantidade Total', type: 'number', placeholder: '5' }]} /></Modal>
-            <Modal isOpen={isRentalModalOpen} onClose={closeAllModals} title="Criar Novo Aluguel"><Form onSubmit={handleRentalSubmit} onCancel={closeAllModals} fields={[{ name: 'clientId', label: 'Cliente', type: 'select', options: clients.map(c => ({ value: c.id, label: c.name })) }, { name: 'productId', label: 'Produto', type: 'select', options: products.filter(p => p.availableQuantity > 0).map(p => ({ value: p.id, label: `${p.name} (${p.availableQuantity} disp.)` })) }, { name: 'startDate', label: 'Data de Início', type: 'date' }]} /></Modal>
-            
-            {/* Modais de Alerta e Confirmação */}
-            <AlertModal isOpen={isAlertModalOpen} onClose={() => setIsAlertModalOpen(false)} message={alertMessage} />
-            <ConfirmModal isOpen={isConfirmModalOpen} onClose={closeConfirmModal} onConfirm={confirmModalProps.onConfirm} text={confirmModalProps.text} />
         </div>
-    );
-}
+    </div>
+    
+    <!-- Toast Notification -->
+    <div id="toast" class="toast fixed bottom-5 right-5 bg-gray-200 text-gray-900 font-semibold py-3 px-5 rounded-lg shadow-xl">
+        <p id="toast-message"></p>
+    </div>
+
+    <!-- Firebase e Lógica do App -->
+    <script type="module">
+        // Importações do Firebase
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, onAuthStateChanged, setPersistence, inMemoryPersistence } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, getDoc, collection, addDoc, onSnapshot, deleteDoc, query, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // --- CONFIGURAÇÃO INICIAL ---
+        // Suas credenciais do Firebase foram inseridas aqui
+        const firebaseConfig = {
+          apiKey: "AIzaSyDMylUG8IxttYiiMFMqlsb5jXkcAaOQ6bQ",
+          authDomain: "painelacailoja.firebaseapp.com",
+          projectId: "painelacailoja",
+          storageBucket: "painelacailoja.appspot.com", // Corrigido para .appspot.com que é o padrão
+          messagingSenderId: "1078717306556",
+          appId: "1:1078717306556:web:d77f600b11397f0cf3a2b9",
+          measurementId: "G-FG7P8K2YWH"
+        };
+        
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+        const auth = getAuth(app);
+
+        let userId = null;
+        let clientsCol, toolsCol, rentalsCol, historyCol;
+
+        // --- AUTENTICAÇÃO E INICIALIZAÇÃO ---
+        onAuthStateChanged(auth, async (user) => {
+            if (user) {
+                userId = user.uid;
+                document.getElementById('user-id-display').textContent = userId;
+                initializeCollections();
+                loadAllData();
+            }
+        });
+
+        (async () => {
+            try {
+                await setPersistence(auth, inMemoryPersistence);
+                // A autenticação agora será anônima, pois não há token customizado
+                await signInAnonymously(auth);
+            } catch (error) {
+                console.error("Authentication Error:", error);
+                document.getElementById('user-id-display').textContent = "Erro de autenticação.";
+            }
+        })();
+        
+        function initializeCollections() {
+            if (!userId) return;
+            // O caminho agora aponta para coleções públicas dentro do seu projeto
+            clientsCol = collection(db, 'rentalClients');
+            toolsCol = collection(db, 'rentalTools');
+            rentalsCol = collection(db, 'rentalsActive');
+            historyCol = collection(db, 'rentalsHistory');
+        }
+
+        function loadAllData() {
+            if (!userId) return;
+            loadClients();
+            loadTools();
+            loadRentals();
+            loadHistory();
+        }
+
+        // --- LÓGICA DAS ABAS ---
+        const tabs = ['rentals', 'history', 'clients', 'tools'];
+        window.switchTab = (tabName) => {
+            tabs.forEach(tab => {
+                document.getElementById(`${tab}-tab`).classList.add('hidden');
+            });
+            document.getElementById(`${tabName}-tab`).classList.remove('hidden');
+
+            document.querySelectorAll('.nav-button').forEach(button => {
+                button.classList.remove('active');
+            });
+            document.querySelector(`button[onclick="switchTab('${tabName}')"]`).classList.add('active');
+        };
+
+        // --- LÓGICA DE NOTIFICAÇÃO (TOAST) ---
+        const toast = document.getElementById('toast');
+        const toastMessage = document.getElementById('toast-message');
+        let toastTimeout;
+
+        function showToast(message) {
+            toastMessage.textContent = message;
+            toast.classList.add('show');
+            clearTimeout(toastTimeout);
+            toastTimeout = setTimeout(() => {
+                toast.classList.remove('show');
+            }, 3000);
+        }
+
+        // --- LÓGICA DE CLIENTES ---
+        const addClientForm = document.getElementById('add-client-form');
+        const clientNameInput = document.getElementById('client-name');
+        const clientPhoneInput = document.getElementById('client-phone');
+        const clientsList = document.getElementById('clients-list');
+        const noClientsMessage = document.getElementById('no-clients-message');
+
+        addClientForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            if (!userId) return showToast("Erro: Usuário não autenticado.");
+            
+            try {
+                await addDoc(clientsCol, { name: clientNameInput.value, phone: clientPhoneInput.value });
+                showToast("Cliente adicionado com sucesso!");
+                addClientForm.reset();
+            } catch (error) {
+                console.error("Erro ao adicionar cliente:", error);
+                showToast("Falha ao adicionar cliente.");
+            }
+        });
+
+        function loadClients() {
+            onSnapshot(query(clientsCol), (snapshot) => {
+                const clientsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                updateRentalFormClients(clientsData);
+
+                if (snapshot.empty) {
+                    clientsList.innerHTML = '';
+                    noClientsMessage.classList.remove('hidden');
+                    return;
+                }
+                
+                noClientsMessage.classList.add('hidden');
+                clientsList.innerHTML = clientsData.map(client => `
+                    <div class="flex items-center justify-between py-4">
+                        <div>
+                            <p class="font-medium text-white">${client.name}</p>
+                            <p class="text-sm text-gray-400">${client.phone || 'Sem telefone'}</p>
+                        </div>
+                    </div>
+                `).join('');
+            });
+        }
+
+        // --- LÓGICA DE FERRAMENTAS ---
+        const addToolForm = document.getElementById('add-tool-form');
+        const toolNameInput = document.getElementById('tool-name');
+        const toolRateInput = document.getElementById('tool-rate');
+        const toolsList = document.getElementById('tools-list');
+        const noToolsMessage = document.getElementById('no-tools-message');
+
+        addToolForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            if (!userId) return showToast("Erro: Usuário não autenticado.");
+
+            try {
+                await addDoc(toolsCol, { name: toolNameInput.value, dailyRate: parseFloat(toolRateInput.value) });
+                showToast("Ferramenta adicionada com sucesso!");
+                addToolForm.reset();
+            } catch (error) {
+                console.error("Erro ao adicionar ferramenta:", error);
+                showToast("Falha ao adicionar ferramenta.");
+            }
+        });
+
+        function loadTools() {
+            onSnapshot(query(toolsCol), (snapshot) => {
+                const toolsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                updateRentalFormTools(toolsData);
+
+                if (snapshot.empty) {
+                    toolsList.innerHTML = '';
+                    noToolsMessage.classList.remove('hidden');
+                    return;
+                }
+
+                noToolsMessage.classList.add('hidden');
+                toolsList.innerHTML = toolsData.map(tool => `
+                    <div class="flex items-center justify-between py-4">
+                        <div>
+                            <p class="font-medium text-white">${tool.name}</p>
+                            <p class="text-sm text-gray-400">R$ ${tool.dailyRate.toFixed(2).replace('.', ',')} / dia</p>
+                        </div>
+                    </div>
+                `).join('');
+            });
+        }
+        
+        // --- LÓGICA DE ALUGUÉIS ---
+        const rentalModal = document.getElementById('rental-modal');
+        const newRentalBtn = document.getElementById('new-rental-btn');
+        const cancelRentalBtn = document.getElementById('cancel-rental-btn');
+        const addRentalForm = document.getElementById('add-rental-form');
+        const rentalClientSelect = document.getElementById('rental-client');
+        const rentalToolSelect = document.getElementById('rental-tool');
+        const rentalDateInput = document.getElementById('rental-date');
+        const rentalsList = document.getElementById('rentals-list');
+        const noRentalsMessage = document.getElementById('no-rentals-message');
+
+        newRentalBtn.addEventListener('click', () => {
+            rentalModal.classList.remove('hidden');
+            rentalModal.classList.add('pointer-events-auto', 'opacity-100');
+            rentalModal.querySelector('div').classList.add('scale-100');
+        });
+
+        const closeModal = () => {
+            rentalModal.querySelector('div').classList.remove('scale-100');
+            rentalModal.classList.remove('opacity-100');
+            rentalModal.classList.add('pointer-events-none', 'hidden');
+        };
+
+        cancelRentalBtn.addEventListener('click', closeModal);
+        rentalModal.addEventListener('click', (e) => {
+            if (e.target === rentalModal) closeModal();
+        });
+
+        function updateRentalFormClients(clients) {
+            if (clients.length === 0) {
+                rentalClientSelect.innerHTML = '<option disabled selected>Cadastre um cliente primeiro</option>';
+            } else {
+                rentalClientSelect.innerHTML = '<option value="" disabled selected>Selecione um cliente</option>' + 
+                clients.map(c => `<option value="${c.id}" data-name="${c.name}">${c.name}</option>`).join('');
+            }
+        }
+
+        function updateRentalFormTools(tools) {
+            if (tools.length === 0) {
+                rentalToolSelect.innerHTML = '<option disabled selected>Cadastre uma ferramenta primeiro</option>';
+            } else {
+                rentalToolSelect.innerHTML = '<option value="" disabled selected>Selecione uma ferramenta</option>' + 
+                tools.map(t => `<option value="${t.id}" data-name="${t.name}" data-rate="${t.dailyRate}">
+                    ${t.name} (R$ ${t.dailyRate.toFixed(2).replace('.',',')})
+                </option>`).join('');
+            }
+        }
+        
+        addRentalForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            if (!userId) return showToast("Erro: Usuário não autenticado.");
+
+            const selectedClientOption = rentalClientSelect.options[rentalClientSelect.selectedIndex];
+            const selectedToolOption = rentalToolSelect.options[rentalToolSelect.selectedIndex];
+
+            try {
+                await addDoc(rentalsCol, {
+                    clientId: rentalClientSelect.value,
+                    clientName: selectedClientOption.dataset.name,
+                    toolId: rentalToolSelect.value,
+                    toolName: selectedToolOption.dataset.name,
+                    dailyRate: parseFloat(selectedToolOption.dataset.rate),
+                    rentalDate: rentalDateInput.value,
+                    status: 'active'
+                });
+                showToast("Aluguel registrado com sucesso!");
+                addRentalForm.reset();
+                closeModal();
+            } catch (error) {
+                console.error("Erro ao registrar aluguel:", error);
+                showToast("Falha ao registrar aluguel.");
+            }
+        });
+
+        function loadRentals() {
+            onSnapshot(query(rentalsCol), (snapshot) => {
+                if (snapshot.empty) {
+                    rentalsList.innerHTML = '';
+                    noRentalsMessage.classList.remove('hidden');
+                    return;
+                }
+                
+                noRentalsMessage.classList.add('hidden');
+                const rentalsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+
+                rentalsList.innerHTML = rentalsData.map(rental => {
+                    const date = new Date(rental.rentalDate + 'T00:00:00-03:00'); // Ajuste para fuso horário local
+                    const formattedDate = date.toLocaleDateString('pt-BR');
+                    return `
+                    <div class="bg-gray-800 border border-gray-700 rounded-lg shadow-lg p-5 flex flex-col justify-between transition-transform hover:scale-105">
+                        <div>
+                            <p class="font-bold text-lg text-blue-400">${rental.toolName}</p>
+                            <p class="text-sm text-gray-400 mb-3">R$ ${rental.dailyRate.toFixed(2).replace('.',',')} / dia</p>
+                            <div class="space-y-2 text-sm mt-4">
+                                <p><i class="fa-solid fa-user text-gray-500 w-5"></i> <span class="font-medium">Cliente:</span> ${rental.clientName}</p>
+                                <p><i class="fa-solid fa-calendar-alt text-gray-500 w-5"></i> <span class="font-medium">Início:</span> ${formattedDate}</p>
+                            </div>
+                        </div>
+                        <button onclick="window.finishRental('${rental.id}')" class="mt-4 w-full bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg transition duration-300">
+                            <i class="fa-solid fa-check-circle mr-2"></i>Finalizar Aluguel
+                        </button>
+                    </div>
+                `}).join('');
+            });
+        }
+        
+        window.finishRental = async (rentalId) => {
+            const userConfirmed = await showConfirmation("Tem certeza que deseja finalizar este aluguel? Ele será movido para o histórico.");
+            if (userConfirmed) {
+                 if (!userId) return showToast("Erro: Usuário não autenticado.");
+                try {
+                    const rentalRef = doc(rentalsCol, rentalId);
+                    const rentalSnap = await getDoc(rentalRef);
+
+                    if (rentalSnap.exists()) {
+                        const rentalData = rentalSnap.data();
+                        // Adiciona ao histórico com uma data de finalização
+                        await addDoc(historyCol, {
+                            ...rentalData,
+                            finishedAt: serverTimestamp() 
+                        });
+                        // Deleta o aluguel ativo
+                        await deleteDoc(rentalRef);
+                        showToast("Aluguel movido para o histórico.");
+                    } else {
+                         showToast("Erro: Aluguel não encontrado.");
+                    }
+                } catch (error) {
+                    console.error("Erro ao finalizar aluguel:", error);
+                    showToast("Falha ao finalizar aluguel.");
+                }
+            }
+        };
+
+        // --- LÓGICA DO HISTÓRICO ---
+        const historyList = document.getElementById('history-list');
+        const noHistoryMessage = document.getElementById('no-history-message');
+
+        function loadHistory() {
+            onSnapshot(query(historyCol), (snapshot) => {
+                if(snapshot.empty) {
+                    historyList.innerHTML = '';
+                    noHistoryMessage.classList.remove('hidden');
+                    return;
+                }
+
+                noHistoryMessage.classList.add('hidden');
+                const historyData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                
+                historyList.innerHTML = historyData.map(item => {
+                    const startDate = new Date(item.rentalDate + 'T00:00:00-03:00');
+                    const formattedStartDate = startDate.toLocaleDateString('pt-BR');
+                    const finishedDate = item.finishedAt ? item.finishedAt.toDate().toLocaleDateString('pt-BR') : 'N/A';
+
+                    return `
+                    <div class="flex items-center justify-between py-4">
+                        <div class="flex-1 grid grid-cols-1 md:grid-cols-4 gap-4 items-center">
+                            <p class="font-medium text-white">${item.toolName}</p>
+                            <p class="text-sm text-gray-400">Cliente: ${item.clientName}</p>
+                            <p class="text-sm text-gray-400">Início: ${formattedStartDate}</p>
+                            <p class="text-sm text-gray-400">Finalizado: ${finishedDate}</p>
+                        </div>
+                        <button onclick="window.deleteFromHistory('${item.id}')" class="ml-4 bg-red-800 hover:bg-red-700 text-white font-bold py-2 px-3 rounded-lg transition-colors">
+                            <i class="fa-solid fa-trash"></i>
+                        </button>
+                    </div>
+                    `
+                }).join('');
+            });
+        }
+
+        window.deleteFromHistory = async (historyId) => {
+            const userConfirmed = await showConfirmation("Excluir registro do histórico? Esta ação é PERMANENTE e não pode ser desfeita.");
+            if(userConfirmed) {
+                if (!userId) return showToast("Erro: Usuário não autenticado.");
+                try {
+                    await deleteDoc(doc(historyCol, historyId));
+                    showToast("Registro excluído permanentemente.");
+                } catch (error) {
+                    console.error("Erro ao excluir registro:", error);
+                    showToast("Falha ao excluir registro.");
+                }
+            }
+        };
+
+
+        function showConfirmation(message) {
+            return new Promise(resolve => {
+                const confirmModal = document.createElement('div');
+                confirmModal.className = 'fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center p-4 z-50';
+                confirmModal.innerHTML = `
+                    <div class="bg-gray-800 border border-gray-700 rounded-lg shadow-2xl p-6 w-full max-w-sm text-center">
+                        <p class="mb-6 text-white">${message}</p>
+                        <div class="flex justify-center space-x-4">
+                            <button id="confirm-cancel" class="bg-gray-600 hover:bg-gray-500 text-white font-bold py-2 px-6 rounded-lg">Cancelar</button>
+                            <button id="confirm-ok" class="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-6 rounded-lg">Confirmar</button>
+                        </div>
+                    </div>
+                `;
+                document.body.appendChild(confirmModal);
+
+                document.getElementById('confirm-ok').onclick = () => {
+                    document.body.removeChild(confirmModal);
+                    resolve(true);
+                };
+                document.getElementById('confirm-cancel').onclick = () => {
+                    document.body.removeChild(confirmModal);
+                    resolve(false);
+                };
+            });
+        }
+    </script>
+</body>
+</html>
