@@ -53,7 +53,7 @@
         <div id="sidebar-overlay" class="fixed inset-0 bg-black bg-opacity-50 z-20 hidden md:hidden"></div>
         
         <!-- Navegação Lateral -->
-        <aside id="sidebar" class="w-64 bg-gray-800 p-4 flex-col fixed inset-y-0 left-0 transform -translate-x-full md:relative md:translate-x-0 z-30">
+        <aside id="sidebar" class="w-64 bg-gray-800 p-4 flex flex-col fixed inset-y-0 left-0 transform -translate-x-full md:relative md:translate-x-0 z-30">
             <div class="flex items-center justify-between mb-8">
                 <div class="flex items-center">
                     <i class="fa-solid fa-helmet-safety text-3xl text-blue-500 mr-3"></i>
@@ -78,7 +78,7 @@
                 </button>
             </nav>
             <div class="mt-auto text-center text-xs text-gray-500">
-                <p>Painel de Gerenciamento v2.3</p>
+                <p>Painel de Gerenciamento v2.9</p>
                 <p class="mt-1 truncate">ID: <span id="user-id-display">Carregando...</span></p>
             </div>
         </aside>
@@ -86,7 +86,7 @@
         <!-- Conteúdo Principal -->
         <div class="flex-1 flex flex-col">
              <!-- Header Mobile -->
-            <header class="md:hidden bg-gray-800 p-4 flex justify-between items-center">
+            <header class="md:hidden bg-gray-800 p-4 flex justify-between items-center sticky top-0 z-10">
                 <button id="open-sidebar-btn" class="text-white">
                     <i class="fa-solid fa-bars text-2xl"></i>
                 </button>
@@ -144,10 +144,17 @@
                     <h2 class="text-2xl sm:text-3xl font-bold text-white mb-6">Gerenciar Ferramentas</h2>
                      <div class="bg-gray-800 p-4 sm:p-6 rounded-lg shadow-lg border border-gray-700">
                         <h3 class="text-xl sm:text-2xl font-semibold mb-4 text-white">Cadastrar Nova Ferramenta</h3>
-                        <form id="add-tool-form" class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                            <input type="text" id="tool-name" placeholder="Nome da Ferramenta" class="p-3 bg-gray-700 border border-gray-600 rounded-md w-full md:col-span-2 text-white placeholder-gray-400 focus:ring-blue-500 focus:border-blue-500" required>
-                            <input type="number" id="tool-rate" placeholder="Valor da Diária (R$)" class="p-3 bg-gray-700 border border-gray-600 rounded-md w-full text-white placeholder-gray-400 focus:ring-blue-500 focus:border-blue-500" step="0.01" required>
-                            <button type="submit" class="md:col-span-3 bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-4 rounded-lg shadow-md transition duration-300 flex items-center justify-center">
+                        <form id="add-tool-form" class="space-y-4">
+                            <input type="text" id="tool-name" placeholder="Nome da Ferramenta" class="p-3 bg-gray-700 border border-gray-600 rounded-md w-full text-white placeholder-gray-400 focus:ring-blue-500 focus:border-blue-500" required>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-400 mb-2">Valores (R$)</label>
+                                <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                                    <input type="number" id="tool-rate-daily" placeholder="Diária Padrão" class="p-3 bg-gray-700 border border-gray-600 rounded-md w-full text-white placeholder-gray-400 focus:ring-blue-500 focus:border-blue-500" step="0.01" required>
+                                    <input type="number" id="tool-rate-weekly" placeholder="Pacote Semanal (7d)" class="p-3 bg-gray-700 border border-gray-600 rounded-md w-full text-white placeholder-gray-400 focus:ring-blue-500 focus:border-blue-500" step="0.01" required>
+                                    <input type="number" id="tool-rate-monthly" placeholder="Pacote Mensal (30d)" class="p-3 bg-gray-700 border border-gray-600 rounded-md w-full text-white placeholder-gray-400 focus:ring-blue-500 focus:border-blue-500" step="0.01" required>
+                                </div>
+                            </div>
+                            <button type="submit" class="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-4 rounded-lg shadow-md transition duration-300 flex items-center justify-center">
                                 <i class="fa-solid fa-plus-circle mr-2"></i>Salvar Ferramenta
                             </button>
                         </form>
@@ -164,34 +171,79 @@
     </div>
 
     <!-- Modal de Novo Aluguel -->
-    <div id="rental-modal" class="modal fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center p-4 hidden pointer-events-none opacity-0">
+    <div id="rental-modal" class="modal fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center p-4 hidden pointer-events-none opacity-0 z-40">
         <div class="bg-gray-800 border border-gray-700 rounded-lg shadow-2xl p-6 md:p-8 w-full max-w-lg transform scale-95 transition-transform duration-300">
             <h2 class="text-2xl font-bold mb-6 text-white">Registrar Novo Aluguel</h2>
-            <form id="add-rental-form">
-                <div class="space-y-4">
-                    <div>
-                        <label for="rental-client" class="block text-sm font-medium text-gray-400 mb-1">Cliente</label>
-                        <select id="rental-client" class="w-full p-3 bg-gray-700 border border-gray-600 rounded-md text-white focus:ring-blue-500 focus:border-blue-500" required></select>
-                    </div>
-                    <div>
-                        <label for="rental-tool" class="block text-sm font-medium text-gray-400 mb-1">Ferramenta</label>
-                        <select id="rental-tool" class="w-full p-3 bg-gray-700 border border-gray-600 rounded-md text-white focus:ring-blue-500 focus:border-blue-500" required></select>
-                    </div>
-                    <div>
-                        <label for="rental-date" class="block text-sm font-medium text-gray-400 mb-1">Data de Início</label>
-                        <input type="date" id="rental-date" class="w-full p-3 bg-gray-700 border border-gray-600 rounded-md text-white" required style="color-scheme: dark;">
-                    </div>
+            <form id="add-rental-form" class="space-y-4">
+                <div>
+                    <label for="rental-client" class="block text-sm font-medium text-gray-400 mb-1">Cliente</label>
+                    <select id="rental-client" class="w-full p-3 bg-gray-700 border border-gray-600 rounded-md text-white focus:ring-blue-500 focus:border-blue-500" required></select>
                 </div>
-                <div class="mt-8 flex justify-end space-x-4">
+                <div>
+                    <label for="rental-tool" class="block text-sm font-medium text-gray-400 mb-1">Ferramenta</label>
+                    <select id="rental-tool" class="w-full p-3 bg-gray-700 border border-gray-600 rounded-md text-white focus:ring-blue-500 focus:border-blue-500" required></select>
+                </div>
+                <div>
+                    <label for="rental-days" class="block text-sm font-medium text-gray-400 mb-1">Duração (dias)</label>
+                    <input type="number" id="rental-days" class="w-full p-3 bg-gray-700 border border-gray-600 rounded-md text-white" required min="1">
+                </div>
+                <div>
+                    <label for="rental-date" class="block text-sm font-medium text-gray-400 mb-1">Data de Início</label>
+                    <input type="date" id="rental-date" class="w-full p-3 bg-gray-700 border border-gray-600 rounded-md text-white" required style="color-scheme: dark;">
+                </div>
+                 <div>
+                    <label for="rental-discount" class="block text-sm font-medium text-gray-400 mb-1">Desconto (R$)</label>
+                    <input type="number" id="rental-discount" class="w-full p-3 bg-gray-700 border border-gray-600 rounded-md text-white" placeholder="0,00" step="0.01" min="0">
+                </div>
+                <div id="price-preview" class="bg-gray-700 p-4 rounded-md hidden space-y-2">
+                    <div class="flex justify-between text-gray-400">
+                        <span>Subtotal:</span>
+                        <span id="subtotal-price-display">R$ 0,00</span>
+                    </div>
+                    <div class="flex justify-between text-green-400">
+                        <span>Desconto:</span>
+                        <span id="discount-display">- R$ 0,00</span>
+                    </div>
+                    <hr class="border-gray-600">
+                    <div class="flex justify-between items-center text-white">
+                        <span class="text-lg font-bold">Total:</span>
+                        <span id="total-price-display" class="text-3xl font-bold">R$ 0,00</span>
+                    </div>
+                    <p id="rate-info-display" class="text-xs text-gray-500 text-center pt-2"></p>
+                </div>
+                <div class="pt-4 flex justify-end space-x-4">
                     <button type="button" id="cancel-rental-btn" class="bg-gray-600 hover:bg-gray-500 text-white font-bold py-2 px-4 rounded-lg transition duration-300">Cancelar</button>
                     <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg shadow-md transition duration-300">Registrar Aluguel</button>
                 </div>
             </form>
         </div>
     </div>
+
+    <!-- Modal de Editar Ferramenta -->
+    <div id="edit-tool-modal" class="modal fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center p-4 hidden pointer-events-none opacity-0 z-40">
+        <div class="bg-gray-800 border border-gray-700 rounded-lg shadow-2xl p-6 md:p-8 w-full max-w-lg transform scale-95 transition-transform duration-300">
+            <h2 class="text-2xl font-bold mb-6 text-white">Editar Ferramenta</h2>
+            <form id="edit-tool-form" class="space-y-4">
+                <input type="hidden" id="edit-tool-id">
+                <input type="text" id="edit-tool-name" placeholder="Nome da Ferramenta" class="p-3 bg-gray-700 border border-gray-600 rounded-md w-full text-white placeholder-gray-400 focus:ring-blue-500 focus:border-blue-500" required>
+                <div>
+                    <label class="block text-sm font-medium text-gray-400 mb-2">Valores (R$)</label>
+                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                        <input type="number" id="edit-tool-rate-daily" placeholder="Diária Padrão" class="p-3 bg-gray-700 border border-gray-600 rounded-md w-full text-white placeholder-gray-400 focus:ring-blue-500 focus:border-blue-500" step="0.01" required>
+                        <input type="number" id="edit-tool-rate-weekly" placeholder="Pacote Semanal" class="p-3 bg-gray-700 border border-gray-600 rounded-md w-full text-white placeholder-gray-400 focus:ring-blue-500 focus:border-blue-500" step="0.01" required>
+                        <input type="number" id="edit-tool-rate-monthly" placeholder="Pacote Mensal" class="p-3 bg-gray-700 border border-gray-600 rounded-md w-full text-white placeholder-gray-400 focus:ring-blue-500 focus:border-blue-500" step="0.01" required>
+                    </div>
+                </div>
+                <div class="pt-4 flex justify-end space-x-4">
+                    <button type="button" id="cancel-edit-tool-btn" class="bg-gray-600 hover:bg-gray-500 text-white font-bold py-2 px-4 rounded-lg transition duration-300">Cancelar</button>
+                    <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg shadow-md transition duration-300">Salvar Alterações</button>
+                </div>
+            </form>
+        </div>
+    </div>
     
     <!-- Toast Notification -->
-    <div id="toast" class="toast fixed bottom-5 right-5 bg-gray-200 text-gray-900 font-semibold py-3 px-5 rounded-lg shadow-xl z-40">
+    <div id="toast" class="toast fixed bottom-5 right-5 bg-gray-200 text-gray-900 font-semibold py-3 px-5 rounded-lg shadow-xl z-50">
         <p id="toast-message"></p>
     </div>
 
@@ -199,7 +251,7 @@
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, signInAnonymously, onAuthStateChanged, setPersistence, inMemoryPersistence } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, doc, getDoc, collection, addDoc, onSnapshot, deleteDoc, query, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getFirestore, doc, getDoc, collection, addDoc, onSnapshot, deleteDoc, updateDoc, query, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         const firebaseConfig = {
           apiKey: "AIzaSyDMylUG8IxttYiiMFMqlsb5jXkcAaOQ6bQ",
@@ -286,7 +338,6 @@
             });
             document.querySelector(`button[onclick="switchTab('${tabName}')"]`).classList.add('active');
             
-            // Fecha o menu mobile ao trocar de aba
             if (window.innerWidth < 768) {
                 closeSidebar();
             }
@@ -305,6 +356,7 @@
             }, 3000);
         }
 
+        // --- LÓGICA DE CLIENTES ---
         const addClientForm = document.getElementById('add-client-form');
         const clientNameInput = document.getElementById('client-name');
         const clientPhoneInput = document.getElementById('client-phone');
@@ -348,18 +400,29 @@
             });
         }
 
+        // --- LÓGICA DE FERRAMENTAS ---
         const addToolForm = document.getElementById('add-tool-form');
         const toolNameInput = document.getElementById('tool-name');
-        const toolRateInput = document.getElementById('tool-rate');
+        const toolRateDailyInput = document.getElementById('tool-rate-daily');
+        const toolRateWeeklyInput = document.getElementById('tool-rate-weekly');
+        const toolRateMonthlyInput = document.getElementById('tool-rate-monthly');
         const toolsList = document.getElementById('tools-list');
         const noToolsMessage = document.getElementById('no-tools-message');
+        const editToolModal = document.getElementById('edit-tool-modal');
+        const editToolForm = document.getElementById('edit-tool-form');
+        const cancelEditToolBtn = document.getElementById('cancel-edit-tool-btn');
 
         addToolForm.addEventListener('submit', async (e) => {
             e.preventDefault();
             if (!userId) return showToast("Erro: Usuário não autenticado.");
 
             try {
-                await addDoc(toolsCol, { name: toolNameInput.value, dailyRate: parseFloat(toolRateInput.value) });
+                await addDoc(toolsCol, { 
+                    name: toolNameInput.value, 
+                    dailyRate: parseFloat(toolRateDailyInput.value),
+                    weeklyRate: parseFloat(toolRateWeeklyInput.value),
+                    monthlyRate: parseFloat(toolRateMonthlyInput.value)
+                });
                 showToast("Ferramenta adicionada com sucesso!");
                 addToolForm.reset();
             } catch (error) {
@@ -381,27 +444,163 @@
 
                 noToolsMessage.classList.add('hidden');
                 toolsList.innerHTML = toolsData.map(tool => `
-                    <div class="flex items-center justify-between py-4">
-                        <div>
-                            <p class="font-medium text-white">${tool.name}</p>
-                            <p class="text-sm text-gray-400">R$ ${tool.dailyRate.toFixed(2).replace('.', ',')} / dia</p>
+                    <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between py-4">
+                        <div class="flex-1">
+                            <p class="font-medium text-white mb-2 sm:mb-0">${tool.name}</p>
+                            <div class="text-xs text-gray-400 flex flex-wrap gap-x-3 gap-y-1">
+                                <span>Diária: R$ ${(tool.dailyRate || 0).toFixed(2).replace('.', ',')}</span>
+                                <span>Pacote Semanal: R$ ${(tool.weeklyRate || 0).toFixed(2).replace('.', ',')}</span>
+                                <span>Pacote Mensal: R$ ${(tool.monthlyRate || 0).toFixed(2).replace('.', ',')}</span>
+                            </div>
+                        </div>
+                        <div class="flex space-x-2 mt-2 sm:mt-0">
+                            <button onclick="window.openEditToolModal('${tool.id}')" class="bg-blue-600 hover:bg-blue-700 text-white p-2 rounded-md w-10 h-10 flex items-center justify-center"><i class="fa-solid fa-pencil"></i></button>
+                            <button onclick="window.deleteTool('${tool.id}')" class="bg-red-600 hover:bg-red-700 text-white p-2 rounded-md w-10 h-10 flex items-center justify-center"><i class="fa-solid fa-trash"></i></button>
                         </div>
                     </div>
                 `).join('');
             });
         }
         
+        window.deleteTool = async (toolId) => {
+            const userConfirmed = await showConfirmation("Excluir esta ferramenta? Esta ação é permanente.");
+            if (userConfirmed) {
+                if (!userId) return showToast("Erro: Usuário não autenticado.");
+                try {
+                    await deleteDoc(doc(toolsCol, toolId));
+                    showToast("Ferramenta excluída com sucesso.");
+                } catch (error) {
+                    console.error("Erro ao excluir ferramenta:", error);
+                    showToast("Falha ao excluir ferramenta.");
+                }
+            }
+        };
+
+        const closeEditToolModal = () => {
+            editToolModal.querySelector('div').classList.remove('scale-100');
+            editToolModal.classList.remove('opacity-100');
+            editToolModal.classList.add('pointer-events-none', 'hidden');
+        };
+
+        window.openEditToolModal = async (toolId) => {
+            try {
+                const toolRef = doc(toolsCol, toolId);
+                const toolSnap = await getDoc(toolRef);
+                if (toolSnap.exists()) {
+                    const tool = toolSnap.data();
+                    document.getElementById('edit-tool-id').value = toolId;
+                    document.getElementById('edit-tool-name').value = tool.name;
+                    document.getElementById('edit-tool-rate-daily').value = tool.dailyRate || 0;
+                    document.getElementById('edit-tool-rate-weekly').value = tool.weeklyRate || 0;
+                    document.getElementById('edit-tool-rate-monthly').value = tool.monthlyRate || 0;
+
+                    editToolModal.classList.remove('hidden');
+                    editToolModal.classList.add('pointer-events-auto', 'opacity-100');
+                    editToolModal.querySelector('div').classList.add('scale-100');
+                } else {
+                    showToast("Erro: Ferramenta não encontrada.");
+                }
+            } catch(error) {
+                showToast("Erro ao carregar dados da ferramenta.");
+                console.error("Erro ao buscar ferramenta:", error);
+            }
+        };
+
+        editToolForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const toolId = document.getElementById('edit-tool-id').value;
+            const updatedData = {
+                name: document.getElementById('edit-tool-name').value,
+                dailyRate: parseFloat(document.getElementById('edit-tool-rate-daily').value),
+                weeklyRate: parseFloat(document.getElementById('edit-tool-rate-weekly').value),
+                monthlyRate: parseFloat(document.getElementById('edit-tool-rate-monthly').value),
+            };
+
+            try {
+                await updateDoc(doc(toolsCol, toolId), updatedData);
+                showToast("Ferramenta atualizada com sucesso!");
+                closeEditToolModal();
+            } catch (error) {
+                console.error("Erro ao atualizar ferramenta:", error);
+                showToast("Falha ao atualizar ferramenta.");
+            }
+        });
+
+        cancelEditToolBtn.addEventListener('click', closeEditToolModal);
+
+
+        // --- LÓGICA DE ALUGUÉIS ---
         const rentalModal = document.getElementById('rental-modal');
         const newRentalBtn = document.getElementById('new-rental-btn');
         const cancelRentalBtn = document.getElementById('cancel-rental-btn');
         const addRentalForm = document.getElementById('add-rental-form');
         const rentalClientSelect = document.getElementById('rental-client');
         const rentalToolSelect = document.getElementById('rental-tool');
+        const rentalDaysInput = document.getElementById('rental-days');
         const rentalDateInput = document.getElementById('rental-date');
+        const rentalDiscountInput = document.getElementById('rental-discount');
         const rentalsList = document.getElementById('rentals-list');
         const noRentalsMessage = document.getElementById('no-rentals-message');
+        const pricePreview = document.getElementById('price-preview');
+        const subtotalPriceDisplay = document.getElementById('subtotal-price-display');
+        const discountDisplay = document.getElementById('discount-display');
+        const totalPriceDisplay = document.getElementById('total-price-display');
+        const rateInfoDisplay = document.getElementById('rate-info-display');
+
+        function calculatePrice(days, dailyRate, weeklyRate, monthlyRate) {
+             if (!days || days < 1) {
+                return { subtotal: 0, details: '' };
+            }
+
+            let subtotal = 0;
+            let details = '';
+
+            if (days >= 30 && monthlyRate > 0) {
+                const extraDays = days - 30;
+                subtotal = monthlyRate + (extraDays > 0 ? extraDays * dailyRate : 0);
+                details = `Pacote Mensal` + (extraDays > 0 ? ` + ${extraDays} diária(s)` : '');
+            } else if (days >= 7 && weeklyRate > 0) {
+                const extraDays = days - 7;
+                subtotal = weeklyRate + (extraDays > 0 ? extraDays * dailyRate : 0);
+                details = `Pacote Semanal` + (extraDays > 0 ? ` + ${extraDays} diária(s)` : '');
+            } else {
+                subtotal = days * dailyRate;
+                details = `${days} diária(s) x R$ ${dailyRate.toFixed(2).replace('.', ',')}`;
+            }
+            return { subtotal, details };
+        }
+
+        function updatePrice() {
+            const selectedToolOption = rentalToolSelect.options[rentalToolSelect.selectedIndex];
+            const days = parseInt(rentalDaysInput.value);
+            const discount = parseFloat(rentalDiscountInput.value) || 0;
+
+            if (!selectedToolOption || !selectedToolOption.value || !days || days < 1) {
+                pricePreview.classList.add('hidden');
+                return;
+            }
+
+            const dailyRate = parseFloat(selectedToolOption.dataset.rateDaily);
+            const weeklyRate = parseFloat(selectedToolOption.dataset.rateWeekly);
+            const monthlyRate = parseFloat(selectedToolOption.dataset.rateMonthly);
+
+            const { subtotal, details } = calculatePrice(days, dailyRate, weeklyRate, monthlyRate);
+            const finalTotal = subtotal - discount > 0 ? subtotal - discount : 0;
+
+            subtotalPriceDisplay.textContent = `R$ ${subtotal.toFixed(2).replace('.', ',')}`;
+            discountDisplay.textContent = `- R$ ${discount.toFixed(2).replace('.', ',')}`;
+            totalPriceDisplay.textContent = `R$ ${finalTotal.toFixed(2).replace('.', ',')}`;
+            rateInfoDisplay.textContent = details;
+            pricePreview.classList.remove('hidden');
+        }
+
+        rentalToolSelect.addEventListener('change', updatePrice);
+        rentalDaysInput.addEventListener('input', updatePrice);
+        rentalDiscountInput.addEventListener('input', updatePrice);
 
         newRentalBtn.addEventListener('click', () => {
+            addRentalForm.reset();
+            pricePreview.classList.add('hidden');
             rentalModal.classList.remove('hidden');
             rentalModal.classList.add('pointer-events-auto', 'opacity-100');
             rentalModal.querySelector('div').classList.add('scale-100');
@@ -432,8 +631,11 @@
                 rentalToolSelect.innerHTML = '<option disabled selected>Cadastre uma ferramenta</option>';
             } else {
                 rentalToolSelect.innerHTML = '<option value="" disabled selected>Selecione uma ferramenta</option>' + 
-                tools.map(t => `<option value="${t.id}" data-name="${t.name}" data-rate="${t.dailyRate}">
-                    ${t.name} (R$ ${t.dailyRate.toFixed(2).replace('.',',')})
+                tools.map(t => `<option value="${t.id}" data-name="${t.name}" 
+                    data-rate-daily="${t.dailyRate}" 
+                    data-rate-weekly="${t.weeklyRate}" 
+                    data-rate-monthly="${t.monthlyRate}">
+                    ${t.name}
                 </option>`).join('');
             }
         }
@@ -444,6 +646,24 @@
 
             const selectedClientOption = rentalClientSelect.options[rentalClientSelect.selectedIndex];
             const selectedToolOption = rentalToolSelect.options[rentalToolSelect.selectedIndex];
+            const days = parseInt(rentalDaysInput.value);
+            const discount = parseFloat(rentalDiscountInput.value) || 0;
+
+            if (!selectedClientOption.value || !selectedToolOption.value || !days || days < 1) {
+                showToast("Por favor, preencha todos os campos.");
+                return;
+            }
+
+            const dailyRate = parseFloat(selectedToolOption.dataset.rateDaily);
+            const weeklyRate = parseFloat(selectedToolOption.dataset.rateWeekly);
+            const monthlyRate = parseFloat(selectedToolOption.dataset.rateMonthly);
+
+            const { subtotal, details } = calculatePrice(days, dailyRate, weeklyRate, monthlyRate);
+            const finalTotal = subtotal - discount > 0 ? subtotal - discount : 0;
+
+            const startDate = new Date(rentalDateInput.value + 'T00:00:00-03:00');
+            const dueDate = new Date(startDate);
+            dueDate.setDate(startDate.getDate() + days);
 
             try {
                 await addDoc(rentalsCol, {
@@ -451,12 +671,16 @@
                     clientName: selectedClientOption.dataset.name,
                     toolId: rentalToolSelect.value,
                     toolName: selectedToolOption.dataset.name,
-                    dailyRate: parseFloat(selectedToolOption.dataset.rate),
                     rentalDate: rentalDateInput.value,
+                    dueDate: dueDate.toISOString(),
+                    rentalDays: days,
+                    subtotal: subtotal,
+                    discount: discount,
+                    totalPrice: finalTotal,
+                    priceCalculationDetails: details,
                     status: 'active'
                 });
                 showToast("Aluguel registrado!");
-                addRentalForm.reset();
                 closeModal();
             } catch (error) {
                 console.error("Erro ao registrar aluguel:", error);
@@ -476,16 +700,47 @@
                 const rentalsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
 
                 rentalsList.innerHTML = rentalsData.map(rental => {
-                    const date = new Date(rental.rentalDate + 'T00:00:00-03:00');
-                    const formattedDate = date.toLocaleDateString('pt-BR');
+                    const now = new Date();
+                    const dueDate = new Date(rental.dueDate);
+                    
+                    // Reset time part to compare dates only
+                    now.setHours(0, 0, 0, 0);
+                    dueDate.setHours(0, 0, 0, 0);
+
+                    const diffTime = dueDate.getTime() - now.getTime();
+                    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+                    let statusText = '';
+                    let statusColorClass = 'border-gray-700'; // Default
+
+                    if (diffDays < 0) {
+                        statusText = `Vencido há ${Math.abs(diffDays)} dia(s)`;
+                        statusColorClass = 'border-red-500';
+                    } else if (diffDays === 0) {
+                        statusText = 'Vence hoje';
+                        statusColorClass = 'border-red-500';
+                    } else if (diffDays <= 2) {
+                        statusText = `Vence em ${diffDays} dia(s)`;
+                        statusColorClass = 'border-yellow-400';
+                    } else {
+                         statusText = `Vence em ${diffDays} dia(s)`;
+                    }
+
+                    const discountInfo = rental.discount > 0 ? `<p class="text-sm text-green-400">Desconto de R$ ${rental.discount.toFixed(2).replace('.',',')} aplicado</p>` : '';
+
                     return `
-                    <div class="bg-gray-800 border border-gray-700 rounded-lg shadow-lg p-5 flex flex-col justify-between transition-transform hover:scale-105">
+                    <div class="bg-gray-800 border-2 ${statusColorClass} rounded-lg shadow-lg p-5 flex flex-col justify-between transition-transform hover:scale-105">
                         <div>
-                            <p class="font-bold text-lg text-blue-400">${rental.toolName}</p>
-                            <p class="text-sm text-gray-400 mb-3">R$ ${rental.dailyRate.toFixed(2).replace('.',',')} / dia</p>
-                            <div class="space-y-2 text-sm mt-4">
-                                <p><i class="fa-solid fa-user text-gray-500 w-5"></i> <span class="font-medium">Cliente:</span> ${rental.clientName}</p>
-                                <p><i class="fa-solid fa-calendar-alt text-gray-500 w-5"></i> <span class="font-medium">Início:</span> ${formattedDate}</p>
+                            <div class="flex justify-between items-start">
+                                <p class="font-bold text-lg text-blue-400">${rental.toolName}</p>
+                                <span class="text-xs font-bold ${statusColorClass === 'border-red-500' ? 'text-red-400' : (statusColorClass === 'border-yellow-400' ? 'text-yellow-400' : 'text-gray-400')}">${statusText}</span>
+                            </div>
+
+                            <p class="font-bold text-2xl text-white my-2">R$ ${(rental.totalPrice || 0).toFixed(2).replace('.',',')}</p>
+                            ${discountInfo}
+                            <div class="space-y-2 text-sm mt-4 text-gray-400">
+                                <p><i class="fa-solid fa-user fa-fw w-5"></i> <span class="font-medium text-gray-300">Cliente:</span> ${rental.clientName}</p>
+                                <p><i class="fa-solid fa-calculator fa-fw w-5"></i> <span class="font-medium text-gray-300">Cálculo:</span> ${rental.priceCalculationDetails || 'N/A'}</p>
                             </div>
                         </div>
                         <button onclick="window.finishRental('${rental.id}')" class="mt-4 w-full bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg transition duration-300">
@@ -540,9 +795,10 @@
 
                     return `
                     <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between py-4 gap-4">
-                        <div class="flex-1 grid grid-cols-2 sm:grid-cols-4 gap-x-4 gap-y-2 items-center w-full">
+                        <div class="flex-1 grid grid-cols-2 sm:grid-cols-5 gap-x-4 gap-y-2 items-center w-full">
                             <p class="font-medium text-white col-span-2 sm:col-span-1">${item.toolName}</p>
                             <p class="text-sm text-gray-400 col-span-2 sm:col-span-1">Cliente: ${item.clientName}</p>
+                            <p class="text-sm text-gray-400 font-semibold">R$ ${(item.totalPrice || 0).toFixed(2).replace('.',',')}</p>
                             <p class="text-sm text-gray-400">Início: ${formattedStartDate}</p>
                             <p class="text-sm text-gray-400">Fim: ${finishedDate}</p>
                         </div>
@@ -568,7 +824,6 @@
                 }
             }
         };
-
 
         function showConfirmation(message) {
             return new Promise(resolve => {
