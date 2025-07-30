@@ -32,7 +32,8 @@ import {
     DollarSign,
     ClipboardList,
     CheckCircle,
-    AlertTriangle
+    AlertTriangle,
+    Sparkles // NOVO: Ícone para a funcionalidade de IA
 } from 'lucide-react';
 
 // --- INÍCIO DA CONFIGURAÇÃO DO FIREBASE ---
@@ -87,7 +88,6 @@ const Modal = ({ isOpen, onClose, title, children }) => {
     );
 };
 
-// --- NOVOS COMPONENTES DE MODAL ---
 const AlertModal = ({ isOpen, onClose, title, message }) => (
     <Modal isOpen={isOpen} onClose={onClose} title={title || "Aviso"}>
         <p className="text-gray-600 mb-6">{message}</p>
@@ -131,11 +131,15 @@ export default function App() {
     const [isRentalModalOpen, setIsRentalModalOpen] = useState(false);
     const [editingItem, setEditingItem] = useState(null);
 
-    // --- CORREÇÃO: Estados para os novos modais ---
     const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
     const [confirmModalProps, setConfirmModalProps] = useState({ onConfirm: () => {}, text: '' });
     const [isAlertModalOpen, setIsAlertModalOpen] = useState(false);
     const [alertMessage, setAlertMessage] = useState('');
+
+    // --- NOVO: Estados para a funcionalidade de IA ---
+    const [aiPrompt, setAiPrompt] = useState('');
+    const [aiResponse, setAiResponse] = useState('');
+    const [isGenerating, setIsGenerating] = useState(false);
 
     useEffect(() => {
         const unsubscribe = onAuthStateChanged(auth, (user) => {
@@ -227,7 +231,6 @@ export default function App() {
         if (!isAuthReady || !userId) return;
         const product = products.find(p => p.id === formData.productId);
         if (!product || product.availableQuantity <= 0) {
-            // CORREÇÃO: Usa modal de alerta
             setAlertMessage("Produto não disponível ou com estoque esgotado para aluguel.");
             setIsAlertModalOpen(true);
             return;
@@ -260,7 +263,6 @@ export default function App() {
         try { await batch.commit(); } catch (error) { console.error("Erro ao completar aluguel:", error); }
     };
     
-    // CORREÇÃO: Refatorado para usar modal de confirmação
     const handleDelete = (collectionName, id) => {
         if (collectionName === 'products' && rentals.some(r => r.productId === id && r.status === 'active')) {
             setAlertMessage("Não é possível excluir um produto com aluguéis ativos.");
@@ -283,7 +285,6 @@ export default function App() {
         setIsConfirmModalOpen(true);
     };
 
-    // CORREÇÃO: Refatorado para usar modal de confirmação
     const handleDeleteRental = (rentalId) => {
         const performDelete = async () => {
             if (!isAuthReady || !userId) return;
@@ -315,6 +316,68 @@ export default function App() {
         if (type === 'client') setIsClientModalOpen(true);
         if (type === 'product') setIsProductModalOpen(true);
         if (type === 'rental') setIsRentalModalOpen(true);
+    };
+
+    // --- NOVO: Lógica para a API Gemini ---
+    const handleGenerateAnalysis = async () => {
+        if (!aiPrompt.trim()) {
+            setAlertMessage("Por favor, digite uma pergunta para a análise.");
+            setIsAlertModalOpen(true);
+            return;
+        }
+
+        setIsGenerating(true);
+        setAiResponse('');
+
+        // Constrói o prompt detalhado para a IA
+        const fullPrompt = `
+            Você é um assistente de análise de negócios para uma empresa de aluguel de equipamentos.
+            Analise os seguintes dados e responda à pergunta do usuário.
+
+            **Dados de Produtos:**
+            ${JSON.stringify(products, null, 2)}
+
+            **Dados de Clientes:**
+            ${JSON.stringify(clients, null, 2)}
+
+            **Dados de Aluguéis:**
+            ${JSON.stringify(rentals, null, 2)}
+
+            **Pergunta do Usuário:**
+            "${aiPrompt}"
+
+            Responda em português, de forma clara e objetiva. Se a pergunta for sobre o item mais alugado ou lucrativo, inclua o nome do item e os números.
+        `;
+
+        const apiKey = ""; // A API Key é gerenciada pelo ambiente
+        const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${apiKey}`;
+
+        try {
+            const response = await fetch(apiUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ contents: [{ parts: [{ text: fullPrompt }] }] })
+            });
+
+            if (!response.ok) {
+                throw new Error(`Erro na API: ${response.statusText}`);
+            }
+
+            const result = await response.json();
+            
+            if (result.candidates && result.candidates.length > 0 && result.candidates[0].content.parts.length > 0) {
+                const text = result.candidates[0].content.parts[0].text;
+                setAiResponse(text);
+            } else {
+                throw new Error("A resposta da API está vazia ou em formato inesperado.");
+            }
+
+        } catch (error) {
+            console.error("Erro ao chamar a API Gemini:", error);
+            setAiResponse(`Ocorreu um erro ao gerar a análise: ${error.message}`);
+        } finally {
+            setIsGenerating(false);
+        }
     };
 
     // --- COMPONENTES DE VISUALIZAÇÃO (VIEWS) ---
@@ -443,6 +506,54 @@ export default function App() {
         )
     }
 
+    // --- NOVO: Componente para a tela de Análise com IA ---
+    const AIAnalysisView = () => (
+        <div>
+            <h2 className="text-3xl font-bold text-gray-800 mb-4">Análise com IA</h2>
+            <p className="text-gray-600 mb-8">Faça uma pergunta em linguagem natural sobre seus dados de aluguel. A IA irá analisar e fornecer insights para você.</p>
+            
+            <div className="bg-white p-6 rounded-2xl shadow-lg">
+                <div className="space-y-4">
+                    <label htmlFor="ai-prompt" className="block text-sm font-medium text-gray-700">Sua pergunta:</label>
+                    <textarea
+                        id="ai-prompt"
+                        rows="3"
+                        value={aiPrompt}
+                        onChange={(e) => setAiPrompt(e.target.value)}
+                        className="w-full p-3 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500"
+                        placeholder="Ex: Qual foi o produto mais alugado? Quem são meus 3 melhores clientes em faturamento?"
+                    />
+                    <button
+                        onClick={handleGenerateAnalysis}
+                        disabled={isGenerating}
+                        className="w-full bg-blue-600 text-white font-bold py-3 px-4 rounded-lg flex items-center justify-center space-x-2 hover:bg-blue-700 transition-colors shadow-md disabled:bg-blue-400 disabled:cursor-not-allowed"
+                    >
+                        {isGenerating ? (
+                            <>
+                                <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+                                <span>Gerando...</span>
+                            </>
+                        ) : (
+                            <>
+                                <Sparkles size={20} />
+                                <span>Gerar Análise</span>
+                            </>
+                        )}
+                    </button>
+                </div>
+
+                {aiResponse && (
+                    <div className="mt-8 pt-6 border-t border-gray-200">
+                        <h3 className="text-xl font-bold text-gray-800 mb-4">Resultado da Análise:</h3>
+                        <div className="bg-gray-100 p-4 rounded-lg whitespace-pre-wrap text-gray-700">
+                            {aiResponse}
+                        </div>
+                    </div>
+                )}
+            </div>
+        </div>
+    );
+
     const Form = ({ fields, onSubmit, initialData, onCancel }) => {
         const [formData, setFormData] = useState({});
         useEffect(() => { setFormData(initialData || fields.reduce((acc, field) => ({...acc, [field.name]: ''}), {})); }, [initialData, fields]);
@@ -476,6 +587,7 @@ export default function App() {
             case 'products': return <GenericListView title="Produtos / Equipamentos" data={products} columns={[{ key: 'name', label: 'Nome' }, { key: 'dailyRate', label: 'Diária (R$)' }, { key: 'totalQuantity', label: 'Qtd. Total' }, { key: 'availableQuantity', label: 'Qtd. Disp.' }]} onAdd={() => openModal('product')} onEdit={(item) => openModal('product', item)} onDelete={handleDelete} collectionName="products" />;
             case 'clients': return <GenericListView title="Clientes" data={clients} columns={[{ key: 'name', label: 'Nome' }, { key: 'phone', label: 'Telefone' }, { key: 'address', label: 'Endereço' }]} onAdd={() => openModal('client')} onEdit={(item) => openModal('client', item)} onDelete={handleDelete} collectionName="clients" />;
             case 'rentals': return <RentalsView />;
+            case 'ai-analysis': return <AIAnalysisView />; // NOVO: Renderiza a tela de IA
             default: return <DashboardView />;
         }
     };
@@ -498,14 +610,19 @@ export default function App() {
                 <div className="p-6 flex items-center justify-between"><h1 className="text-2xl font-bold text-white">RentalSys</h1><button onClick={() => setIsSidebarOpen(false)} className="lg:hidden text-gray-400 hover:text-white"><X size={24} /></button></div>
                 <nav className="p-4">
                     <ul>
-                        <NavItem icon={<Home size={22} />} label="Dashboard" viewName="dashboard" /><NavItem icon={<Package size={22} />} label="Produtos" viewName="products" /><NavItem icon={<Users size={22} />} label="Clientes" viewName="clients" /><NavItem icon={<ShoppingCart size={22} />} label="Aluguéis" viewName="rentals" />
+                        <NavItem icon={<Home size={22} />} label="Dashboard" viewName="dashboard" />
+                        <NavItem icon={<Package size={22} />} label="Produtos" viewName="products" />
+                        <NavItem icon={<Users size={22} />} label="Clientes" viewName="clients" />
+                        <NavItem icon={<ShoppingCart size={22} />} label="Aluguéis" viewName="rentals" />
+                        {/* NOVO: Item de menu para a Análise com IA */}
+                        <NavItem icon={<Sparkles size={22} />} label="Análise com IA" viewName="ai-analysis" />
                     </ul>
                 </nav>
                  <div className="absolute bottom-4 left-4 right-4 p-2 text-xs text-gray-400 break-words"><p className="font-semibold">ID do Usuário:</p><p className="text-gray-500">{userId}</p></div>
             </aside>
 
             <main className="flex-1 flex flex-col overflow-y-auto">
-                <header className="bg-white shadow-sm p-4 flex justify-between items-center lg:hidden"><h1 className="text-xl font-bold text-gray-800 capitalize">{currentView}</h1><button onClick={() => setIsSidebarOpen(true)} className="text-gray-600"><Menu size={28} /></button></header>
+                <header className="bg-white shadow-sm p-4 flex justify-between items-center lg:hidden"><h1 className="text-xl font-bold text-gray-800 capitalize">{currentView.replace('-', ' ')}</h1><button onClick={() => setIsSidebarOpen(true)} className="text-gray-600"><Menu size={28} /></button></header>
                 <div className="p-6 md:p-8 flex-1">{renderView()}</div>
             </main>
 
