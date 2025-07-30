@@ -78,7 +78,7 @@
                 </button>
             </nav>
             <div class="mt-auto text-center text-xs text-gray-500">
-                <p>Painel de Gerenciamento v2.9</p>
+                <p>Painel de Gerenciamento v3.1</p>
                 <p class="mt-1 truncate">ID: <span id="user-id-display">Carregando...</span></p>
             </div>
         </aside>
@@ -132,7 +132,10 @@
                         </form>
                     </div>
                      <div class="bg-gray-800 p-4 sm:p-6 rounded-lg shadow-lg border border-gray-700">
-                        <h3 class="text-xl sm:text-2xl font-semibold mb-4 text-white">Clientes Cadastrados</h3>
+                        <div class="flex justify-between items-center mb-4">
+                            <h3 class="text-xl sm:text-2xl font-semibold text-white">Clientes Cadastrados</h3>
+                            <input type="search" id="search-client-input" placeholder="Buscar cliente..." class="p-2 bg-gray-700 border border-gray-600 rounded-md w-full max-w-xs text-white placeholder-gray-400 focus:ring-blue-500 focus:border-blue-500">
+                        </div>
                         <div id="clients-list" class="divide-y divide-gray-700">
                             <p id="no-clients-message" class="text-gray-400 py-4">Nenhum cliente cadastrado.</p>
                         </div>
@@ -176,8 +179,9 @@
             <h2 class="text-2xl font-bold mb-6 text-white">Registrar Novo Aluguel</h2>
             <form id="add-rental-form" class="space-y-4">
                 <div>
-                    <label for="rental-client" class="block text-sm font-medium text-gray-400 mb-1">Cliente</label>
-                    <select id="rental-client" class="w-full p-3 bg-gray-700 border border-gray-600 rounded-md text-white focus:ring-blue-500 focus:border-blue-500" required></select>
+                    <label for="search-modal-client-input" class="block text-sm font-medium text-gray-400 mb-1">Buscar Cliente</label>
+                    <input type="search" id="search-modal-client-input" placeholder="Digite para buscar..." class="w-full p-2 mb-2 bg-gray-700 border border-gray-600 rounded-md text-white placeholder-gray-400 focus:ring-blue-500 focus:border-blue-500">
+                    <select id="rental-client" class="w-full p-3 bg-gray-700 border border-gray-600 rounded-md text-white focus:ring-blue-500 focus:border-blue-500" required size="5"></select>
                 </div>
                 <div>
                     <label for="rental-tool" class="block text-sm font-medium text-gray-400 mb-1">Ferramenta</label>
@@ -241,6 +245,22 @@
             </form>
         </div>
     </div>
+
+    <!-- Modal de Editar Cliente -->
+    <div id="edit-client-modal" class="modal fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center p-4 hidden pointer-events-none opacity-0 z-40">
+        <div class="bg-gray-800 border border-gray-700 rounded-lg shadow-2xl p-6 md:p-8 w-full max-w-lg transform scale-95 transition-transform duration-300">
+            <h2 class="text-2xl font-bold mb-6 text-white">Editar Cliente</h2>
+            <form id="edit-client-form" class="space-y-4">
+                <input type="hidden" id="edit-client-id">
+                <input type="text" id="edit-client-name" placeholder="Nome do Cliente" class="p-3 bg-gray-700 border border-gray-600 rounded-md w-full text-white placeholder-gray-400 focus:ring-blue-500 focus:border-blue-500" required>
+                <input type="text" id="edit-client-phone" placeholder="Telefone" class="p-3 bg-gray-700 border border-gray-600 rounded-md w-full text-white placeholder-gray-400 focus:ring-blue-500 focus:border-blue-500">
+                <div class="pt-4 flex justify-end space-x-4">
+                    <button type="button" id="cancel-edit-client-btn" class="bg-gray-600 hover:bg-gray-500 text-white font-bold py-2 px-4 rounded-lg transition duration-300">Cancelar</button>
+                    <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg shadow-md transition duration-300">Salvar Alterações</button>
+                </div>
+            </form>
+        </div>
+    </div>
     
     <!-- Toast Notification -->
     <div id="toast" class="toast fixed bottom-5 right-5 bg-gray-200 text-gray-900 font-semibold py-3 px-5 rounded-lg shadow-xl z-50">
@@ -251,7 +271,7 @@
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, signInAnonymously, onAuthStateChanged, setPersistence, inMemoryPersistence } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, doc, getDoc, collection, addDoc, onSnapshot, deleteDoc, updateDoc, query, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getFirestore, doc, getDoc, collection, addDoc, onSnapshot, deleteDoc, updateDoc, query, where, getDocs, writeBatch, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         const firebaseConfig = {
           apiKey: "AIzaSyDMylUG8IxttYiiMFMqlsb5jXkcAaOQ6bQ",
@@ -269,6 +289,7 @@
 
         let userId = null;
         let clientsCol, toolsCol, rentalsCol, historyCol;
+        let allClients = [];
 
         onAuthStateChanged(auth, async (user) => {
             if (user) {
@@ -362,6 +383,12 @@
         const clientPhoneInput = document.getElementById('client-phone');
         const clientsList = document.getElementById('clients-list');
         const noClientsMessage = document.getElementById('no-clients-message');
+        const editClientModal = document.getElementById('edit-client-modal');
+        const editClientForm = document.getElementById('edit-client-form');
+        const cancelEditClientBtn = document.getElementById('cancel-edit-client-btn');
+        const searchClientInput = document.getElementById('search-client-input');
+        const searchModalClientInput = document.getElementById('search-modal-client-input');
+
 
         addClientForm.addEventListener('submit', async (e) => {
             e.preventDefault();
@@ -377,28 +404,138 @@
             }
         });
 
+        function renderClients(clientsToRender) {
+             if (clientsToRender.length === 0) {
+                clientsList.innerHTML = `<p class="text-gray-400 py-4">Nenhum cliente encontrado.</p>`;
+                noClientsMessage.classList.add('hidden');
+                return;
+            }
+            
+            noClientsMessage.classList.add('hidden');
+            clientsList.innerHTML = clientsToRender.map(client => `
+                <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between py-4">
+                    <div class="flex-1">
+                        <p class="font-medium text-white">${client.name}</p>
+                        <p class="text-sm text-gray-400">${client.phone || 'Sem telefone'}</p>
+                    </div>
+                    <div class="flex space-x-2 mt-2 sm:mt-0">
+                        <button onclick="window.openEditClientModal('${client.id}')" class="bg-blue-600 hover:bg-blue-700 text-white p-2 rounded-md w-10 h-10 flex items-center justify-center"><i class="fa-solid fa-pencil"></i></button>
+                        <button onclick="window.deleteClient('${client.id}')" class="bg-red-600 hover:bg-red-700 text-white p-2 rounded-md w-10 h-10 flex items-center justify-center"><i class="fa-solid fa-trash"></i></button>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        searchClientInput.addEventListener('input', (e) => {
+            const searchTerm = e.target.value.toLowerCase();
+            const filteredClients = allClients.filter(client => client.name.toLowerCase().includes(searchTerm));
+            renderClients(filteredClients);
+        });
+
+        searchModalClientInput.addEventListener('input', (e) => {
+            const searchTerm = e.target.value.toLowerCase();
+            const options = rentalClientSelect.options;
+            for (let i = 0; i < options.length; i++) {
+                const optionText = options[i].text.toLowerCase();
+                options[i].style.display = optionText.includes(searchTerm) ? '' : 'none';
+            }
+        });
+
+
         function loadClients() {
             onSnapshot(query(clientsCol), (snapshot) => {
-                const clientsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                updateRentalFormClients(clientsData);
-
-                if (snapshot.empty) {
-                    clientsList.innerHTML = '';
-                    noClientsMessage.classList.remove('hidden');
-                    return;
-                }
-                
-                noClientsMessage.classList.add('hidden');
-                clientsList.innerHTML = clientsData.map(client => `
-                    <div class="flex items-center justify-between py-4">
-                        <div>
-                            <p class="font-medium text-white">${client.name}</p>
-                            <p class="text-sm text-gray-400">${client.phone || 'Sem telefone'}</p>
-                        </div>
-                    </div>
-                `).join('');
+                allClients = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                renderClients(allClients);
+                updateRentalFormClients(allClients);
             });
         }
+
+        const closeEditClientModal = () => {
+            editClientModal.querySelector('div').classList.remove('scale-100');
+            editClientModal.classList.remove('opacity-100');
+            editClientModal.classList.add('pointer-events-none', 'hidden');
+        };
+
+        window.openEditClientModal = async (clientId) => {
+            try {
+                const clientRef = doc(clientsCol, clientId);
+                const clientSnap = await getDoc(clientRef);
+                if (clientSnap.exists()) {
+                    const client = clientSnap.data();
+                    document.getElementById('edit-client-id').value = clientId;
+                    document.getElementById('edit-client-name').value = client.name;
+                    document.getElementById('edit-client-phone').value = client.phone || '';
+
+                    editClientModal.classList.remove('hidden');
+                    editClientModal.classList.add('pointer-events-auto', 'opacity-100');
+                    editClientModal.querySelector('div').classList.add('scale-100');
+                } else {
+                    showToast("Erro: Cliente não encontrado.");
+                }
+            } catch(error) {
+                showToast("Erro ao carregar dados do cliente.");
+                console.error("Erro ao buscar cliente:", error);
+            }
+        };
+
+        cancelEditClientBtn.addEventListener('click', closeEditClientModal);
+
+        async function updateClientNameInRentals(clientId, newName) {
+            const batch = writeBatch(db);
+            
+            const activeRentalsQuery = query(rentalsCol, where("clientId", "==", clientId));
+            const activeRentalsSnapshot = await getDocs(activeRentalsQuery);
+            activeRentalsSnapshot.forEach(doc => {
+                batch.update(doc.ref, { clientName: newName });
+            });
+
+            const historyRentalsQuery = query(historyCol, where("clientId", "==", clientId));
+            const historyRentalsSnapshot = await getDocs(historyRentalsQuery);
+            historyRentalsSnapshot.forEach(doc => {
+                batch.update(doc.ref, { clientName: newName });
+            });
+
+            await batch.commit();
+        }
+
+        editClientForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const clientId = document.getElementById('edit-client-id').value;
+            const newName = document.getElementById('edit-client-name').value;
+            const newPhone = document.getElementById('edit-client-phone').value;
+            
+            try {
+                await updateDoc(doc(clientsCol, clientId), { name: newName, phone: newPhone });
+                await updateClientNameInRentals(clientId, newName);
+                showToast("Cliente atualizado com sucesso!");
+                closeEditClientModal();
+            } catch (error) {
+                console.error("Erro ao atualizar cliente:", error);
+                showToast("Falha ao atualizar cliente.");
+            }
+        });
+
+        window.deleteClient = async (clientId) => {
+            const activeRentalsQuery = query(rentalsCol, where("clientId", "==", clientId));
+            const activeRentalsSnapshot = await getDocs(activeRentalsQuery);
+            if (!activeRentalsSnapshot.empty) {
+                showToast("Não é possível excluir um cliente com aluguéis ativos.");
+                return;
+            }
+
+            const userConfirmed = await showConfirmation("Excluir este cliente? Esta ação é permanente.");
+            if (userConfirmed) {
+                if (!userId) return showToast("Erro: Usuário não autenticado.");
+                try {
+                    await deleteDoc(doc(clientsCol, clientId));
+                    showToast("Cliente excluído com sucesso.");
+                } catch (error) {
+                    console.error("Erro ao excluir cliente:", error);
+                    showToast("Falha ao excluir cliente.");
+                }
+            }
+        };
+
 
         // --- LÓGICA DE FERRAMENTAS ---
         const addToolForm = document.getElementById('add-tool-form');
@@ -601,6 +738,12 @@
         newRentalBtn.addEventListener('click', () => {
             addRentalForm.reset();
             pricePreview.classList.add('hidden');
+            searchModalClientInput.value = ''; // Limpa a busca
+            // Mostra todas as opções novamente
+            const options = rentalClientSelect.options;
+            for (let i = 0; i < options.length; i++) {
+                options[i].style.display = '';
+            }
             rentalModal.classList.remove('hidden');
             rentalModal.classList.add('pointer-events-auto', 'opacity-100');
             rentalModal.querySelector('div').classList.add('scale-100');
@@ -621,8 +764,7 @@
             if (clients.length === 0) {
                 rentalClientSelect.innerHTML = '<option disabled selected>Cadastre um cliente</option>';
             } else {
-                rentalClientSelect.innerHTML = '<option value="" disabled selected>Selecione um cliente</option>' + 
-                clients.map(c => `<option value="${c.id}" data-name="${c.name}">${c.name}</option>`).join('');
+                rentalClientSelect.innerHTML = clients.map(c => `<option value="${c.id}" data-name="${c.name}">${c.name}</option>`).join('');
             }
         }
 
@@ -649,7 +791,7 @@
             const days = parseInt(rentalDaysInput.value);
             const discount = parseFloat(rentalDiscountInput.value) || 0;
 
-            if (!selectedClientOption.value || !selectedToolOption.value || !days || days < 1) {
+            if (!selectedClientOption || !selectedClientOption.value || !selectedToolOption.value || !days || days < 1) {
                 showToast("Por favor, preencha todos os campos.");
                 return;
             }
@@ -703,7 +845,6 @@
                     const now = new Date();
                     const dueDate = new Date(rental.dueDate);
                     
-                    // Reset time part to compare dates only
                     now.setHours(0, 0, 0, 0);
                     dueDate.setHours(0, 0, 0, 0);
 
@@ -711,7 +852,7 @@
                     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
 
                     let statusText = '';
-                    let statusColorClass = 'border-gray-700'; // Default
+                    let statusColorClass = 'border-gray-700';
 
                     if (diffDays < 0) {
                         statusText = `Vencido há ${Math.abs(diffDays)} dia(s)`;
