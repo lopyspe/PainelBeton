@@ -70,6 +70,9 @@
                 <button onclick="switchTab('history')" class="nav-button flex items-center p-3 rounded-lg text-left text-gray-300 hover:bg-gray-700 transition-colors">
                     <i class="fa-solid fa-history w-6 mr-3"></i>Histórico
                 </button>
+                 <button onclick="switchTab('reports')" class="nav-button flex items-center p-3 rounded-lg text-left text-gray-300 hover:bg-gray-700 transition-colors">
+                    <i class="fa-solid fa-chart-line w-6 mr-3"></i>Relatórios
+                </button>
                 <button onclick="switchTab('clients')" class="nav-button flex items-center p-3 rounded-lg text-left text-gray-300 hover:bg-gray-700 transition-colors">
                     <i class="fa-solid fa-users w-6 mr-3"></i>Clientes
                 </button>
@@ -78,7 +81,7 @@
                 </button>
             </nav>
             <div class="mt-auto text-center text-xs text-gray-500">
-                <p>Painel de Gerenciamento v3.1</p>
+                <p>Painel de Gerenciamento v3.2</p>
                 <p class="mt-1 truncate">ID: <span id="user-id-display">Carregando...</span></p>
             </div>
         </aside>
@@ -114,6 +117,54 @@
                     <div class="bg-gray-800 p-4 sm:p-6 rounded-lg shadow-lg border border-gray-700">
                         <div id="history-list" class="divide-y divide-gray-700">
                             <p id="no-history-message" class="text-gray-400 py-4">Nenhum aluguel finalizado no histórico.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Aba de Relatórios -->
+                <div id="reports-tab" class="hidden space-y-6">
+                    <h2 class="text-2xl sm:text-3xl font-bold text-white mb-6">Relatórios de Faturamento</h2>
+                    <div class="bg-gray-800 p-4 sm:p-6 rounded-lg shadow-lg border border-gray-700 space-y-4">
+                        <h3 class="text-xl font-semibold text-white">Selecionar Período</h3>
+                        <div class="flex flex-col sm:flex-row gap-4">
+                            <div class="flex-1">
+                                <label for="start-date" class="block text-sm font-medium text-gray-400 mb-1">Data de Início</label>
+                                <input type="date" id="start-date" class="w-full p-2 bg-gray-700 border border-gray-600 rounded-md text-white" style="color-scheme: dark;">
+                            </div>
+                            <div class="flex-1">
+                                <label for="end-date" class="block text-sm font-medium text-gray-400 mb-1">Data de Fim</label>
+                                <input type="date" id="end-date" class="w-full p-2 bg-gray-700 border border-gray-600 rounded-md text-white" style="color-scheme: dark;">
+                            </div>
+                        </div>
+                        <button id="generate-report-btn" class="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg shadow-md transition duration-300 flex items-center justify-center">
+                            <i class="fa-solid fa-cogs mr-2"></i>Gerar Relatório
+                        </button>
+                    </div>
+                    <div id="report-results" class="hidden bg-gray-800 p-4 sm:p-6 rounded-lg shadow-lg border border-gray-700 space-y-4">
+                        <div class="flex justify-between items-center">
+                             <h3 class="text-xl font-semibold text-white">Resultados</h3>
+                             <button id="export-csv-btn" class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg shadow-md transition duration-300 flex items-center justify-center">
+                                <i class="fa-solid fa-file-excel mr-2"></i>Exportar para CSV
+                            </button>
+                        </div>
+                        <div id="report-summary" class="bg-gray-700 p-4 rounded-md text-center">
+                            <p class="text-gray-400">Faturamento Total no Período</p>
+                            <p id="report-total-revenue" class="text-3xl font-bold text-white">R$ 0,00</p>
+                        </div>
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-left">
+                                <thead class="border-b border-gray-600">
+                                    <tr>
+                                        <th class="p-2">Finalizado em</th>
+                                        <th class="p-2">Cliente</th>
+                                        <th class="p-2">Ferramenta</th>
+                                        <th class="p-2 text-right">Valor Total (R$)</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="report-table-body">
+                                    <!-- Linhas do relatório serão inseridas aqui -->
+                                </tbody>
+                            </table>
                         </div>
                     </div>
                 </div>
@@ -271,7 +322,7 @@
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, signInAnonymously, onAuthStateChanged, setPersistence, inMemoryPersistence } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, doc, getDoc, collection, addDoc, onSnapshot, deleteDoc, updateDoc, query, where, getDocs, writeBatch, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getFirestore, doc, getDoc, collection, addDoc, onSnapshot, deleteDoc, updateDoc, query, where, getDocs, writeBatch, serverTimestamp, Timestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         const firebaseConfig = {
           apiKey: "AIzaSyDMylUG8IxttYiiMFMqlsb5jXkcAaOQ6bQ",
@@ -290,6 +341,7 @@
         let userId = null;
         let clientsCol, toolsCol, rentalsCol, historyCol;
         let allClients = [];
+        let currentReportData = [];
 
         onAuthStateChanged(auth, async (user) => {
             if (user) {
@@ -347,7 +399,7 @@
         sidebarOverlay.addEventListener('click', closeSidebar);
 
         // --- LÓGICA DAS ABAS ---
-        const tabs = ['rentals', 'history', 'clients', 'tools'];
+        const tabs = ['rentals', 'history', 'reports', 'clients', 'tools'];
         window.switchTab = (tabName) => {
             tabs.forEach(tab => {
                 document.getElementById(`${tab}-tab`).classList.add('hidden');
@@ -914,6 +966,99 @@
                 }
             }
         };
+
+        // --- LÓGICA DE RELATÓRIOS ---
+        const generateReportBtn = document.getElementById('generate-report-btn');
+        const exportCsvBtn = document.getElementById('export-csv-btn');
+        const reportResultsDiv = document.getElementById('report-results');
+        const reportTotalRevenue = document.getElementById('report-total-revenue');
+        const reportTableBody = document.getElementById('report-table-body');
+
+        generateReportBtn.addEventListener('click', async () => {
+            const startDateInput = document.getElementById('start-date').value;
+            const endDateInput = document.getElementById('end-date').value;
+
+            if (!startDateInput || !endDateInput) {
+                showToast("Por favor, selecione as datas de início e fim.");
+                return;
+            }
+
+            const startDate = new Date(startDateInput + 'T00:00:00-03:00');
+            const endDate = new Date(endDateInput + 'T23:59:59-03:00');
+
+            if (startDate > endDate) {
+                showToast("A data de início não pode ser maior que a data de fim.");
+                return;
+            }
+
+            const startTimestamp = Timestamp.fromDate(startDate);
+            const endTimestamp = Timestamp.fromDate(endDate);
+
+            const reportQuery = query(historyCol, where("finishedAt", ">=", startTimestamp), where("finishedAt", "<=", endTimestamp));
+            
+            try {
+                const querySnapshot = await getDocs(reportQuery);
+                currentReportData = querySnapshot.docs.map(doc => doc.data());
+
+                let totalRevenue = 0;
+                reportTableBody.innerHTML = '';
+
+                if (currentReportData.length === 0) {
+                     reportTableBody.innerHTML = `<tr><td colspan="4" class="p-4 text-center text-gray-400">Nenhum registro encontrado para este período.</td></tr>`;
+                } else {
+                    currentReportData.forEach(item => {
+                        totalRevenue += item.totalPrice;
+                        const finishedDate = item.finishedAt.toDate().toLocaleDateString('pt-BR');
+                        const row = `
+                            <tr>
+                                <td class="p-2">${finishedDate}</td>
+                                <td class="p-2">${item.clientName}</td>
+                                <td class="p-2">${item.toolName}</td>
+                                <td class="p-2 text-right">R$ ${(item.totalPrice || 0).toFixed(2).replace('.', ',')}</td>
+                            </tr>
+                        `;
+                        reportTableBody.innerHTML += row;
+                    });
+                }
+
+                reportTotalRevenue.textContent = `R$ ${totalRevenue.toFixed(2).replace('.', ',')}`;
+                reportResultsDiv.classList.remove('hidden');
+
+            } catch (error) {
+                console.error("Erro ao gerar relatório:", error);
+                showToast("Falha ao gerar relatório.");
+            }
+        });
+
+        exportCsvBtn.addEventListener('click', () => {
+            if (currentReportData.length === 0) {
+                showToast("Não há dados para exportar.");
+                return;
+            }
+
+            const headers = ['Finalizado em', 'Cliente', 'Ferramenta', 'Valor Total (R$)'];
+            let csvContent = "data:text/csv;charset=utf-8," + headers.join(",") + "\n";
+
+            currentReportData.forEach(item => {
+                const finishedDate = item.finishedAt.toDate().toLocaleDateString('pt-BR');
+                const row = [
+                    finishedDate,
+                    `"${item.clientName}"`,
+                    `"${item.toolName}"`,
+                    (item.totalPrice || 0).toFixed(2).replace('.', ',')
+                ].join(",");
+                csvContent += row + "\n";
+            });
+
+            const encodedUri = encodeURI(csvContent);
+            const link = document.createElement("a");
+            link.setAttribute("href", encodedUri);
+            link.setAttribute("download", "relatorio_faturamento.csv");
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        });
+
 
         const historyList = document.getElementById('history-list');
         const noHistoryMessage = document.getElementById('no-history-message');
