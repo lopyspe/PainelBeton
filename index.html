@@ -41,16 +41,27 @@
         ::-webkit-scrollbar-thumb:hover {
             background: #6b7280; /* bg-gray-500 */
         }
+        aside {
+            transition: transform 0.3s ease-in-out;
+        }
     </style>
 </head>
 <body class="bg-gray-900 text-gray-300">
 
-    <div class="flex h-screen">
+    <div class="relative min-h-screen md:flex">
+        <!-- Overlay para menu mobile -->
+        <div id="sidebar-overlay" class="fixed inset-0 bg-black bg-opacity-50 z-20 hidden md:hidden"></div>
+        
         <!-- Navegação Lateral -->
-        <aside class="w-64 bg-gray-800 p-4 flex flex-col">
-            <div class="flex items-center mb-8">
-                <i class="fa-solid fa-helmet-safety text-3xl text-blue-500 mr-3"></i>
-                <h1 class="text-xl font-bold text-white">RentalSys</h1>
+        <aside id="sidebar" class="w-64 bg-gray-800 p-4 flex-col fixed inset-y-0 left-0 transform -translate-x-full md:relative md:translate-x-0 z-30">
+            <div class="flex items-center justify-between mb-8">
+                <div class="flex items-center">
+                    <i class="fa-solid fa-helmet-safety text-3xl text-blue-500 mr-3"></i>
+                    <h1 class="text-xl font-bold text-white">RentalSys</h1>
+                </div>
+                 <button id="close-sidebar-btn" class="md:hidden text-gray-400 hover:text-white">
+                    <i class="fa-solid fa-times text-xl"></i>
+                </button>
             </div>
             <nav class="flex flex-col space-y-2">
                 <button onclick="switchTab('rentals')" class="nav-button active flex items-center p-3 rounded-lg text-left text-gray-300 hover:bg-gray-700 transition-colors">
@@ -67,34 +78,41 @@
                 </button>
             </nav>
             <div class="mt-auto text-center text-xs text-gray-500">
-                <p>Painel de Gerenciamento v2.2</p>
+                <p>Painel de Gerenciamento v2.3</p>
                 <p class="mt-1 truncate">ID: <span id="user-id-display">Carregando...</span></p>
             </div>
         </aside>
 
         <!-- Conteúdo Principal -->
-        <div class="flex-1 flex flex-col overflow-y-auto">
-            <main class="p-6 md:p-8 lg:p-10">
+        <div class="flex-1 flex flex-col">
+             <!-- Header Mobile -->
+            <header class="md:hidden bg-gray-800 p-4 flex justify-between items-center">
+                <button id="open-sidebar-btn" class="text-white">
+                    <i class="fa-solid fa-bars text-2xl"></i>
+                </button>
+                <h1 class="text-lg font-bold text-white">RentalSys</h1>
+                <div></div> <!-- Spacer -->
+            </header>
+
+            <main class="flex-1 p-4 sm:p-6 md:p-8 lg:p-10 overflow-y-auto">
                 <!-- Aba de Aluguéis -->
                 <div id="rentals-tab" class="space-y-6">
-                    <div class="flex justify-between items-center">
-                        <h2 class="text-3xl font-bold text-white">Acompanhamento de Aluguéis</h2>
-                        <button id="new-rental-btn" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg shadow-md transition duration-300 flex items-center">
+                    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                        <h2 class="text-2xl sm:text-3xl font-bold text-white">Acompanhamento de Aluguéis</h2>
+                        <button id="new-rental-btn" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg shadow-md transition duration-300 flex items-center w-full sm:w-auto justify-center">
                             <i class="fa-solid fa-plus mr-2"></i>Novo Aluguel
                         </button>
                     </div>
                     <div id="rentals-list" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                        <!-- Cards de aluguel serão inseridos aqui -->
-                         <p id="no-rentals-message" class="text-gray-400 col-span-full">Nenhum aluguel ativo no momento. Clique em "Novo Aluguel" para começar.</p>
+                         <p id="no-rentals-message" class="text-gray-400 col-span-full">Nenhum aluguel ativo no momento.</p>
                     </div>
                 </div>
                 
                 <!-- Aba de Histórico -->
                 <div id="history-tab" class="hidden space-y-6">
-                    <h2 class="text-3xl font-bold text-white mb-6">Histórico de Aluguéis</h2>
-                    <div class="bg-gray-800 p-6 rounded-lg shadow-lg border border-gray-700">
+                    <h2 class="text-2xl sm:text-3xl font-bold text-white mb-6">Histórico de Aluguéis</h2>
+                    <div class="bg-gray-800 p-4 sm:p-6 rounded-lg shadow-lg border border-gray-700">
                         <div id="history-list" class="divide-y divide-gray-700">
-                             <!-- Lista do histórico será inserida aqui -->
                             <p id="no-history-message" class="text-gray-400 py-4">Nenhum aluguel finalizado no histórico.</p>
                         </div>
                     </div>
@@ -102,9 +120,9 @@
 
                 <!-- Aba de Clientes -->
                 <div id="clients-tab" class="hidden space-y-6">
-                    <h2 class="text-3xl font-bold text-white mb-6">Gerenciar Clientes</h2>
-                    <div class="bg-gray-800 p-6 rounded-lg shadow-lg border border-gray-700">
-                        <h3 class="text-2xl font-semibold mb-4 text-white">Cadastrar Novo Cliente</h3>
+                    <h2 class="text-2xl sm:text-3xl font-bold text-white mb-6">Gerenciar Clientes</h2>
+                    <div class="bg-gray-800 p-4 sm:p-6 rounded-lg shadow-lg border border-gray-700">
+                        <h3 class="text-xl sm:text-2xl font-semibold mb-4 text-white">Cadastrar Novo Cliente</h3>
                         <form id="add-client-form" class="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <input type="text" id="client-name" placeholder="Nome do Cliente" class="p-3 bg-gray-700 border border-gray-600 rounded-md w-full text-white placeholder-gray-400 focus:ring-blue-500 focus:border-blue-500" required>
                             <input type="text" id="client-phone" placeholder="Telefone" class="p-3 bg-gray-700 border border-gray-600 rounded-md w-full text-white placeholder-gray-400 focus:ring-blue-500 focus:border-blue-500">
@@ -113,10 +131,9 @@
                             </button>
                         </form>
                     </div>
-                     <div class="bg-gray-800 p-6 rounded-lg shadow-lg border border-gray-700">
-                        <h3 class="text-2xl font-semibold mb-4 text-white">Clientes Cadastrados</h3>
+                     <div class="bg-gray-800 p-4 sm:p-6 rounded-lg shadow-lg border border-gray-700">
+                        <h3 class="text-xl sm:text-2xl font-semibold mb-4 text-white">Clientes Cadastrados</h3>
                         <div id="clients-list" class="divide-y divide-gray-700">
-                            <!-- Lista de clientes será inserida aqui -->
                             <p id="no-clients-message" class="text-gray-400 py-4">Nenhum cliente cadastrado.</p>
                         </div>
                     </div>
@@ -124,21 +141,20 @@
 
                 <!-- Aba de Ferramentas -->
                 <div id="tools-tab" class="hidden space-y-6">
-                    <h2 class="text-3xl font-bold text-white mb-6">Gerenciar Ferramentas</h2>
-                     <div class="bg-gray-800 p-6 rounded-lg shadow-lg border border-gray-700">
-                        <h3 class="text-2xl font-semibold mb-4 text-white">Cadastrar Nova Ferramenta</h3>
+                    <h2 class="text-2xl sm:text-3xl font-bold text-white mb-6">Gerenciar Ferramentas</h2>
+                     <div class="bg-gray-800 p-4 sm:p-6 rounded-lg shadow-lg border border-gray-700">
+                        <h3 class="text-xl sm:text-2xl font-semibold mb-4 text-white">Cadastrar Nova Ferramenta</h3>
                         <form id="add-tool-form" class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                            <input type="text" id="tool-name" placeholder="Nome da Ferramenta (ex: Betoneira 400L)" class="p-3 bg-gray-700 border border-gray-600 rounded-md w-full md:col-span-2 text-white placeholder-gray-400 focus:ring-blue-500 focus:border-blue-500" required>
+                            <input type="text" id="tool-name" placeholder="Nome da Ferramenta" class="p-3 bg-gray-700 border border-gray-600 rounded-md w-full md:col-span-2 text-white placeholder-gray-400 focus:ring-blue-500 focus:border-blue-500" required>
                             <input type="number" id="tool-rate" placeholder="Valor da Diária (R$)" class="p-3 bg-gray-700 border border-gray-600 rounded-md w-full text-white placeholder-gray-400 focus:ring-blue-500 focus:border-blue-500" step="0.01" required>
                             <button type="submit" class="md:col-span-3 bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-4 rounded-lg shadow-md transition duration-300 flex items-center justify-center">
                                 <i class="fa-solid fa-plus-circle mr-2"></i>Salvar Ferramenta
                             </button>
                         </form>
                     </div>
-                     <div class="bg-gray-800 p-6 rounded-lg shadow-lg border border-gray-700">
-                        <h3 class="text-2xl font-semibold mb-4 text-white">Ferramentas Cadastradas</h3>
+                     <div class="bg-gray-800 p-4 sm:p-6 rounded-lg shadow-lg border border-gray-700">
+                        <h3 class="text-xl sm:text-2xl font-semibold mb-4 text-white">Ferramentas Cadastradas</h3>
                         <div id="tools-list" class="divide-y divide-gray-700">
-                            <!-- Lista de ferramentas será inserida aqui -->
                             <p id="no-tools-message" class="text-gray-400 py-4">Nenhuma ferramenta cadastrada.</p>
                         </div>
                     </div>
@@ -175,24 +191,21 @@
     </div>
     
     <!-- Toast Notification -->
-    <div id="toast" class="toast fixed bottom-5 right-5 bg-gray-200 text-gray-900 font-semibold py-3 px-5 rounded-lg shadow-xl">
+    <div id="toast" class="toast fixed bottom-5 right-5 bg-gray-200 text-gray-900 font-semibold py-3 px-5 rounded-lg shadow-xl z-40">
         <p id="toast-message"></p>
     </div>
 
     <!-- Firebase e Lógica do App -->
     <script type="module">
-        // Importações do Firebase
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, signInAnonymously, onAuthStateChanged, setPersistence, inMemoryPersistence } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, doc, getDoc, collection, addDoc, onSnapshot, deleteDoc, query, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-        // --- CONFIGURAÇÃO INICIAL ---
-        // Suas credenciais do Firebase foram inseridas aqui
         const firebaseConfig = {
           apiKey: "AIzaSyDMylUG8IxttYiiMFMqlsb5jXkcAaOQ6bQ",
           authDomain: "painelacailoja.firebaseapp.com",
           projectId: "painelacailoja",
-          storageBucket: "painelacailoja.appspot.com", // Corrigido para .appspot.com que é o padrão
+          storageBucket: "painelacailoja.appspot.com",
           messagingSenderId: "1078717306556",
           appId: "1:1078717306556:web:d77f600b11397f0cf3a2b9",
           measurementId: "G-FG7P8K2YWH"
@@ -205,7 +218,6 @@
         let userId = null;
         let clientsCol, toolsCol, rentalsCol, historyCol;
 
-        // --- AUTENTICAÇÃO E INICIALIZAÇÃO ---
         onAuthStateChanged(auth, async (user) => {
             if (user) {
                 userId = user.uid;
@@ -218,7 +230,6 @@
         (async () => {
             try {
                 await setPersistence(auth, inMemoryPersistence);
-                // A autenticação agora será anônima, pois não há token customizado
                 await signInAnonymously(auth);
             } catch (error) {
                 console.error("Authentication Error:", error);
@@ -228,7 +239,6 @@
         
         function initializeCollections() {
             if (!userId) return;
-            // O caminho agora aponta para coleções públicas dentro do seu projeto
             clientsCol = collection(db, 'rentalClients');
             toolsCol = collection(db, 'rentalTools');
             rentalsCol = collection(db, 'rentalsActive');
@@ -243,6 +253,26 @@
             loadHistory();
         }
 
+        // --- LÓGICA DO MENU MOBILE ---
+        const sidebar = document.getElementById('sidebar');
+        const openSidebarBtn = document.getElementById('open-sidebar-btn');
+        const closeSidebarBtn = document.getElementById('close-sidebar-btn');
+        const sidebarOverlay = document.getElementById('sidebar-overlay');
+
+        function openSidebar() {
+            sidebar.classList.remove('-translate-x-full');
+            sidebarOverlay.classList.remove('hidden');
+        }
+
+        function closeSidebar() {
+            sidebar.classList.add('-translate-x-full');
+            sidebarOverlay.classList.add('hidden');
+        }
+
+        openSidebarBtn.addEventListener('click', openSidebar);
+        closeSidebarBtn.addEventListener('click', closeSidebar);
+        sidebarOverlay.addEventListener('click', closeSidebar);
+
         // --- LÓGICA DAS ABAS ---
         const tabs = ['rentals', 'history', 'clients', 'tools'];
         window.switchTab = (tabName) => {
@@ -255,9 +285,13 @@
                 button.classList.remove('active');
             });
             document.querySelector(`button[onclick="switchTab('${tabName}')"]`).classList.add('active');
+            
+            // Fecha o menu mobile ao trocar de aba
+            if (window.innerWidth < 768) {
+                closeSidebar();
+            }
         };
 
-        // --- LÓGICA DE NOTIFICAÇÃO (TOAST) ---
         const toast = document.getElementById('toast');
         const toastMessage = document.getElementById('toast-message');
         let toastTimeout;
@@ -271,7 +305,6 @@
             }, 3000);
         }
 
-        // --- LÓGICA DE CLIENTES ---
         const addClientForm = document.getElementById('add-client-form');
         const clientNameInput = document.getElementById('client-name');
         const clientPhoneInput = document.getElementById('client-phone');
@@ -315,7 +348,6 @@
             });
         }
 
-        // --- LÓGICA DE FERRAMENTAS ---
         const addToolForm = document.getElementById('add-tool-form');
         const toolNameInput = document.getElementById('tool-name');
         const toolRateInput = document.getElementById('tool-rate');
@@ -359,7 +391,6 @@
             });
         }
         
-        // --- LÓGICA DE ALUGUÉIS ---
         const rentalModal = document.getElementById('rental-modal');
         const newRentalBtn = document.getElementById('new-rental-btn');
         const cancelRentalBtn = document.getElementById('cancel-rental-btn');
@@ -389,7 +420,7 @@
 
         function updateRentalFormClients(clients) {
             if (clients.length === 0) {
-                rentalClientSelect.innerHTML = '<option disabled selected>Cadastre um cliente primeiro</option>';
+                rentalClientSelect.innerHTML = '<option disabled selected>Cadastre um cliente</option>';
             } else {
                 rentalClientSelect.innerHTML = '<option value="" disabled selected>Selecione um cliente</option>' + 
                 clients.map(c => `<option value="${c.id}" data-name="${c.name}">${c.name}</option>`).join('');
@@ -398,7 +429,7 @@
 
         function updateRentalFormTools(tools) {
             if (tools.length === 0) {
-                rentalToolSelect.innerHTML = '<option disabled selected>Cadastre uma ferramenta primeiro</option>';
+                rentalToolSelect.innerHTML = '<option disabled selected>Cadastre uma ferramenta</option>';
             } else {
                 rentalToolSelect.innerHTML = '<option value="" disabled selected>Selecione uma ferramenta</option>' + 
                 tools.map(t => `<option value="${t.id}" data-name="${t.name}" data-rate="${t.dailyRate}">
@@ -424,7 +455,7 @@
                     rentalDate: rentalDateInput.value,
                     status: 'active'
                 });
-                showToast("Aluguel registrado com sucesso!");
+                showToast("Aluguel registrado!");
                 addRentalForm.reset();
                 closeModal();
             } catch (error) {
@@ -445,7 +476,7 @@
                 const rentalsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
 
                 rentalsList.innerHTML = rentalsData.map(rental => {
-                    const date = new Date(rental.rentalDate + 'T00:00:00-03:00'); // Ajuste para fuso horário local
+                    const date = new Date(rental.rentalDate + 'T00:00:00-03:00');
                     const formattedDate = date.toLocaleDateString('pt-BR');
                     return `
                     <div class="bg-gray-800 border border-gray-700 rounded-lg shadow-lg p-5 flex flex-col justify-between transition-transform hover:scale-105">
@@ -466,7 +497,7 @@
         }
         
         window.finishRental = async (rentalId) => {
-            const userConfirmed = await showConfirmation("Tem certeza que deseja finalizar este aluguel? Ele será movido para o histórico.");
+            const userConfirmed = await showConfirmation("Finalizar este aluguel? Ele será movido para o histórico.");
             if (userConfirmed) {
                  if (!userId) return showToast("Erro: Usuário não autenticado.");
                 try {
@@ -475,12 +506,7 @@
 
                     if (rentalSnap.exists()) {
                         const rentalData = rentalSnap.data();
-                        // Adiciona ao histórico com uma data de finalização
-                        await addDoc(historyCol, {
-                            ...rentalData,
-                            finishedAt: serverTimestamp() 
-                        });
-                        // Deleta o aluguel ativo
+                        await addDoc(historyCol, { ...rentalData, finishedAt: serverTimestamp() });
                         await deleteDoc(rentalRef);
                         showToast("Aluguel movido para o histórico.");
                     } else {
@@ -493,7 +519,6 @@
             }
         };
 
-        // --- LÓGICA DO HISTÓRICO ---
         const historyList = document.getElementById('history-list');
         const noHistoryMessage = document.getElementById('no-history-message');
 
@@ -514,14 +539,14 @@
                     const finishedDate = item.finishedAt ? item.finishedAt.toDate().toLocaleDateString('pt-BR') : 'N/A';
 
                     return `
-                    <div class="flex items-center justify-between py-4">
-                        <div class="flex-1 grid grid-cols-1 md:grid-cols-4 gap-4 items-center">
-                            <p class="font-medium text-white">${item.toolName}</p>
-                            <p class="text-sm text-gray-400">Cliente: ${item.clientName}</p>
+                    <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between py-4 gap-4">
+                        <div class="flex-1 grid grid-cols-2 sm:grid-cols-4 gap-x-4 gap-y-2 items-center w-full">
+                            <p class="font-medium text-white col-span-2 sm:col-span-1">${item.toolName}</p>
+                            <p class="text-sm text-gray-400 col-span-2 sm:col-span-1">Cliente: ${item.clientName}</p>
                             <p class="text-sm text-gray-400">Início: ${formattedStartDate}</p>
-                            <p class="text-sm text-gray-400">Finalizado: ${finishedDate}</p>
+                            <p class="text-sm text-gray-400">Fim: ${finishedDate}</p>
                         </div>
-                        <button onclick="window.deleteFromHistory('${item.id}')" class="ml-4 bg-red-800 hover:bg-red-700 text-white font-bold py-2 px-3 rounded-lg transition-colors">
+                        <button onclick="window.deleteFromHistory('${item.id}')" class="w-full sm:w-auto ml-0 sm:ml-4 bg-red-800 hover:bg-red-700 text-white font-bold py-2 px-3 rounded-lg transition-colors flex-shrink-0">
                             <i class="fa-solid fa-trash"></i>
                         </button>
                     </div>
@@ -531,7 +556,7 @@
         }
 
         window.deleteFromHistory = async (historyId) => {
-            const userConfirmed = await showConfirmation("Excluir registro do histórico? Esta ação é PERMANENTE e não pode ser desfeita.");
+            const userConfirmed = await showConfirmation("Excluir registro do histórico? Esta ação é PERMANENTE.");
             if(userConfirmed) {
                 if (!userId) return showToast("Erro: Usuário não autenticado.");
                 try {
