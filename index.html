@@ -1,0 +1,522 @@
+import React, { useState, useEffect, useMemo } from 'react';
+import { initializeApp } from 'firebase/app';
+import { 
+    getAuth, 
+    signInAnonymously, 
+    onAuthStateChanged
+} from 'firebase/auth';
+import { 
+    getFirestore, 
+    collection, 
+    doc, 
+    addDoc, 
+    setDoc,
+    getDoc,
+    onSnapshot, 
+    query,
+    updateDoc,
+    deleteDoc,
+    Timestamp,
+    writeBatch
+} from 'firebase/firestore';
+import { 
+    Home, 
+    Package, 
+    Users, 
+    ShoppingCart, 
+    PlusCircle, 
+    Edit, 
+    Trash2,
+    X,
+    Menu,
+    DollarSign,
+    ClipboardList,
+    CheckCircle,
+    AlertTriangle
+} from 'lucide-react';
+
+// --- INÍCIO DA CONFIGURAÇÃO DO FIREBASE ---
+const firebaseConfig = {
+  apiKey: "AIzaSyDMylUG8IxttYiiMFMqlsb5jXkcAaOQ6bQ",
+  authDomain: "painelacailoja.firebaseapp.com",
+  projectId: "painelacailoja",
+  storageBucket: "painelacailoja.firebasestorage.app",
+  messagingSenderId: "1078717306556",
+  appId: "1:1078717306556:web:d77f600b11397f0cf3a2b9",
+  measurementId: "G-FG7P8K2YWH"
+};
+
+const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-rental-app';
+
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getFirestore(app);
+// --- FIM DA CONFIGURAÇÃO DO FIREBASE ---
+
+// Componente para um Card de Estatística no Dashboard
+const StatCard = ({ title, value, icon, color }) => (
+    <div className="bg-white p-6 rounded-2xl shadow-lg flex items-center space-x-4 transition-transform hover:scale-105">
+        <div className={`p-3 rounded-full ${color}`}>
+            {icon}
+        </div>
+        <div>
+            <p className="text-sm text-gray-500 font-medium">{title}</p>
+            <p className="text-2xl font-bold text-gray-800">{value}</p>
+        </div>
+    </div>
+);
+
+// Componente para o Modal genérico
+const Modal = ({ isOpen, onClose, title, children }) => {
+    if (!isOpen) return null;
+
+    return (
+        <div className="fixed inset-0 bg-black bg-opacity-60 z-50 flex justify-center items-center p-4">
+            <div className="bg-gray-50 rounded-2xl shadow-2xl w-full max-w-md m-4" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+                <div className="flex justify-between items-center p-5 border-b border-gray-200">
+                    <h3 id="modal-title" className="text-xl font-bold text-gray-800">{title}</h3>
+                    <button onClick={onClose} className="text-gray-400 hover:text-gray-600 transition-colors">
+                        <X size={28} />
+                    </button>
+                </div>
+                <div className="p-6">
+                    {children}
+                </div>
+            </div>
+        </div>
+    );
+};
+
+// --- NOVOS COMPONENTES DE MODAL ---
+const AlertModal = ({ isOpen, onClose, title, message }) => (
+    <Modal isOpen={isOpen} onClose={onClose} title={title || "Aviso"}>
+        <p className="text-gray-600 mb-6">{message}</p>
+        <div className="flex justify-end">
+            <button onClick={onClose} className="bg-blue-600 text-white font-bold py-2 px-6 rounded-lg hover:bg-blue-700 transition-colors">
+                OK
+            </button>
+        </div>
+    </Modal>
+);
+
+const ConfirmModal = ({ isOpen, onClose, onConfirm, text }) => (
+     <Modal isOpen={isOpen} onClose={onClose} title="Confirmação">
+        <p className="text-gray-600 mb-6">{text}</p>
+        <div className="flex justify-end space-x-4">
+            <button onClick={onClose} className="bg-gray-200 text-gray-800 font-bold py-2 px-6 rounded-lg hover:bg-gray-300 transition-colors">
+                Cancelar
+            </button>
+            <button onClick={onConfirm} className="bg-red-600 text-white font-bold py-2 px-6 rounded-lg hover:bg-red-700 transition-colors">
+                Confirmar
+            </button>
+        </div>
+    </Modal>
+);
+
+
+// Componente principal da Aplicação
+export default function App() {
+    const [userId, setUserId] = useState(null);
+    const [isAuthReady, setIsAuthReady] = useState(false);
+    
+    const [products, setProducts] = useState([]);
+    const [clients, setClients] = useState([]);
+    const [rentals, setRentals] = useState([]);
+
+    const [currentView, setCurrentView] = useState('dashboard');
+    const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+
+    const [isProductModalOpen, setIsProductModalOpen] = useState(false);
+    const [isClientModalOpen, setIsClientModalOpen] = useState(false);
+    const [isRentalModalOpen, setIsRentalModalOpen] = useState(false);
+    const [editingItem, setEditingItem] = useState(null);
+
+    // --- CORREÇÃO: Estados para os novos modais ---
+    const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
+    const [confirmModalProps, setConfirmModalProps] = useState({ onConfirm: () => {}, text: '' });
+    const [isAlertModalOpen, setIsAlertModalOpen] = useState(false);
+    const [alertMessage, setAlertMessage] = useState('');
+
+    useEffect(() => {
+        const unsubscribe = onAuthStateChanged(auth, (user) => {
+            if (user) {
+                setUserId(user.uid);
+                setIsAuthReady(true);
+            } else {
+                signInAnonymously(auth).catch(err => {
+                     console.error("Erro na autenticação anônima:", err);
+                     setIsAuthReady(true);
+                });
+            }
+        });
+        return () => unsubscribe();
+    }, []);
+
+    useEffect(() => {
+        if (!isAuthReady || !userId) return;
+        const collections = { products: setProducts, clients: setClients, rentals: setRentals };
+        const unsubscribers = Object.entries(collections).map(([name, setter]) => {
+            const collectionRef = collection(db, 'artifacts', appId, 'users', userId, name);
+            const q = query(collectionRef);
+            return onSnapshot(q, (querySnapshot) => {
+                const items = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                if (name === 'rentals') {
+                    items.forEach(item => {
+                        if (item.startDate instanceof Timestamp) item.startDate = item.startDate.toDate();
+                        if (item.endDate instanceof Timestamp) item.endDate = item.endDate.toDate();
+                    });
+                }
+                setter(items);
+            }, (error) => console.error(`Erro ao carregar ${name}:`, error));
+        });
+        return () => unsubscribers.forEach(unsub => unsub());
+    }, [isAuthReady, userId]);
+    
+    // --- LÓGICA DE NEGÓCIO E MANIPULADORES DE EVENTOS ---
+    
+    const closeAllModals = () => {
+        setIsClientModalOpen(false);
+        setIsProductModalOpen(false);
+        setIsRentalModalOpen(false);
+        setEditingItem(null);
+    };
+    
+    const closeConfirmModal = () => {
+        setIsConfirmModalOpen(false);
+        setConfirmModalProps({ onConfirm: () => {}, text: '' });
+    };
+
+    const handleClientSubmit = async (formData) => {
+        if (!isAuthReady || !userId) return;
+        try {
+            const collectionRef = collection(db, 'artifacts', appId, 'users', userId, 'clients');
+            if (editingItem) {
+                await setDoc(doc(db, collectionRef.path, editingItem.id), formData);
+            } else {
+                await addDoc(collectionRef, formData);
+            }
+            closeAllModals();
+        } catch (error) { console.error("Erro ao salvar cliente:", error); }
+    };
+
+    const handleProductSubmit = async (formData) => {
+        if (!isAuthReady || !userId) return;
+        const dataToSave = {
+            ...formData,
+            dailyRate: parseFloat(formData.dailyRate) || 0,
+            totalQuantity: parseInt(formData.totalQuantity) || 0,
+        };
+        if (!editingItem) {
+            dataToSave.availableQuantity = dataToSave.totalQuantity;
+        } else {
+            const rentedCount = rentals.filter(r => r.productId === editingItem.id && r.status === 'active').length;
+            dataToSave.availableQuantity = dataToSave.totalQuantity - rentedCount;
+        }
+        try {
+            const collectionRef = collection(db, 'artifacts', appId, 'users',userId, 'products');
+            if (editingItem) {
+                await setDoc(doc(db, collectionRef.path, editingItem.id), dataToSave);
+            } else {
+                await addDoc(collectionRef, dataToSave);
+            }
+            closeAllModals();
+        } catch (error) { console.error("Erro ao salvar produto:", error); }
+    };
+
+    const handleRentalSubmit = async (formData) => {
+        if (!isAuthReady || !userId) return;
+        const product = products.find(p => p.id === formData.productId);
+        if (!product || product.availableQuantity <= 0) {
+            // CORREÇÃO: Usa modal de alerta
+            setAlertMessage("Produto não disponível ou com estoque esgotado para aluguel.");
+            setIsAlertModalOpen(true);
+            return;
+        }
+        const client = clients.find(c => c.id === formData.clientId);
+        const dataToSave = { ...formData, productName: product.name, clientName: client.name, startDate: Timestamp.fromDate(new Date(formData.startDate)), endDate: null, status: 'active', dailyRate: product.dailyRate };
+        const batch = writeBatch(db);
+        const rentalRef = doc(collection(db, 'artifacts', appId, 'users', userId, 'rentals'));
+        batch.set(rentalRef, dataToSave);
+        const productRef = doc(db, 'artifacts', appId, 'users', userId, 'products', product.id);
+        batch.update(productRef, { availableQuantity: product.availableQuantity - 1 });
+        try {
+            await batch.commit();
+            closeAllModals();
+        } catch (error) { console.error("Erro ao criar aluguel:", error); }
+    };
+
+    const handleCompleteRental = async (rentalId) => {
+        if (!isAuthReady || !userId) return;
+        const rental = rentals.find(r => r.id === rentalId);
+        if (!rental) return;
+        const batch = writeBatch(db);
+        const rentalRef = doc(db, 'artifacts', appId, 'users', userId, 'rentals', rentalId);
+        batch.update(rentalRef, { status: 'completed', endDate: Timestamp.now() });
+        const productRef = doc(db, 'artifacts', appId, 'users', userId, 'products', rental.productId);
+        const productDoc = await getDoc(productRef);
+        if (productDoc.exists()) {
+             batch.update(productRef, { availableQuantity: productDoc.data().availableQuantity + 1 });
+        }
+        try { await batch.commit(); } catch (error) { console.error("Erro ao completar aluguel:", error); }
+    };
+    
+    // CORREÇÃO: Refatorado para usar modal de confirmação
+    const handleDelete = (collectionName, id) => {
+        if (collectionName === 'products' && rentals.some(r => r.productId === id && r.status === 'active')) {
+            setAlertMessage("Não é possível excluir um produto com aluguéis ativos.");
+            setIsAlertModalOpen(true);
+            return;
+        }
+        if (collectionName === 'clients' && rentals.some(r => r.clientId === id && r.status === 'active')) {
+            setAlertMessage("Não é possível excluir um cliente com aluguéis ativos.");
+            setIsAlertModalOpen(true);
+            return;
+        }
+        const performDelete = async () => {
+            if (!isAuthReady || !userId) return;
+            try {
+                await deleteDoc(doc(db, 'artifacts', appId, 'users', userId, collectionName, id));
+            } catch (error) { console.error(`Erro ao excluir item de ${collectionName}:`, error); }
+            closeConfirmModal();
+        };
+        setConfirmModalProps({ onConfirm: performDelete, text: 'Tem certeza que deseja excluir este item? Esta ação não pode ser desfeita.' });
+        setIsConfirmModalOpen(true);
+    };
+
+    // CORREÇÃO: Refatorado para usar modal de confirmação
+    const handleDeleteRental = (rentalId) => {
+        const performDelete = async () => {
+            if (!isAuthReady || !userId) return;
+            const rental = rentals.find(r => r.id === rentalId);
+            if (!rental) { console.error("Aluguel não encontrado."); closeConfirmModal(); return; }
+            try {
+                if (rental.status === 'active') {
+                    const batch = writeBatch(db);
+                    const rentalRef = doc(db, 'artifacts', appId, 'users', userId, 'rentals', rentalId);
+                    batch.delete(rentalRef);
+                    const productRef = doc(db, 'artifacts', appId, 'users', userId, 'products', rental.productId);
+                    const productDoc = await getDoc(productRef);
+                    if (productDoc.exists()) {
+                        batch.update(productRef, { availableQuantity: productDoc.data().availableQuantity + 1 });
+                    }
+                    await batch.commit();
+                } else {
+                    await deleteDoc(doc(db, 'artifacts', appId, 'users', userId, 'rentals', rentalId));
+                }
+            } catch (error) { console.error("Erro ao excluir aluguel:", error); }
+            closeConfirmModal();
+        };
+        setConfirmModalProps({ onConfirm: performDelete, text: 'Tem certeza que deseja excluir este aluguel? Esta ação não pode ser desfeita.' });
+        setIsConfirmModalOpen(true);
+    };
+
+    const openModal = (type, item = null) => {
+        setEditingItem(item);
+        if (type === 'client') setIsClientModalOpen(true);
+        if (type === 'product') setIsProductModalOpen(true);
+        if (type === 'rental') setIsRentalModalOpen(true);
+    };
+
+    // --- COMPONENTES DE VISUALIZAÇÃO (VIEWS) ---
+    const DashboardView = () => {
+        const stats = useMemo(() => {
+            const activeRentals = rentals.filter(r => r.status === 'active');
+            const completedRentals = rentals.filter(r => r.status === 'completed');
+            const totalRevenue = completedRentals.reduce((acc, rental) => {
+                const days = Math.max(1, Math.ceil(((rental.endDate || new Date()) - rental.startDate) / (1000 * 60 * 60 * 24)));
+                return acc + (days * rental.dailyRate);
+            }, 0);
+            return {
+                totalRentals: rentals.length,
+                activeRentals: activeRentals.length,
+                totalRevenue: totalRevenue.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }),
+            };
+        }, [rentals]);
+        return (
+            <div>
+                <h2 className="text-3xl font-bold text-gray-800 mb-8">Dashboard</h2>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+                    <StatCard title="Total de Aluguéis" value={stats.totalRentals} icon={<ClipboardList className="text-white" size={24}/>} color="bg-blue-500" />
+                    <StatCard title="Aluguéis Ativos" value={stats.activeRentals} icon={<ShoppingCart className="text-white" size={24}/>} color="bg-green-500" />
+                    <StatCard title="Faturamento (Concluídos)" value={stats.totalRevenue} icon={<DollarSign className="text-white" size={24}/>} color="bg-yellow-500" />
+                </div>
+            </div>
+        );
+    };
+
+    const GenericListView = ({ title, data, columns, onAdd, onEdit, onDelete, collectionName }) => (
+        <div>
+            <div className="flex justify-between items-center mb-8">
+                <h2 className="text-3xl font-bold text-gray-800">{title}</h2>
+                <button onClick={onAdd} className="bg-blue-600 text-white font-bold py-2 px-4 rounded-lg flex items-center space-x-2 hover:bg-blue-700 transition-colors shadow-md">
+                    <PlusCircle size={20} /><span>Adicionar</span>
+                </button>
+            </div>
+            <div className="bg-white rounded-2xl shadow-lg overflow-hidden">
+                <div className="overflow-x-auto">
+                    <table className="w-full text-left">
+                        <thead>
+                            <tr className="bg-gray-50 border-b-2 border-gray-100">
+                                {columns.map(col => <th key={col.key} className="p-4 font-semibold text-gray-600 uppercase text-sm">{col.label}</th>)}
+                                <th className="p-4 font-semibold text-gray-600 uppercase text-sm">Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {data.map(item => (
+                                <tr key={item.id} className="border-b border-gray-100 hover:bg-gray-50">
+                                    {columns.map(col => <td key={col.key} className="p-4 text-gray-800">{item[col.key]}</td>)}
+                                    <td className="p-4 flex items-center space-x-2">
+                                        <button onClick={() => onEdit(item)} className="p-2 text-gray-500 hover:text-blue-600 hover:bg-blue-100 rounded-full"><Edit size={18}/></button>
+                                        <button onClick={() => onDelete(collectionName, item.id)} className="p-2 text-gray-500 hover:text-red-600 hover:bg-red-100 rounded-full"><Trash2 size={18}/></button>
+                                    </td>
+                                </tr>
+                            ))}
+                             {data.length === 0 && ( <tr><td colSpan={columns.length + 1} className="text-center p-6 text-gray-500">Nenhum item encontrado.</td></tr> )}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    );
+    
+    const RentalsView = () => {
+        const activeRentals = rentals.filter(r => r.status === 'active');
+        const completedRentals = rentals.filter(r => r.status === 'completed');
+        return (
+            <div>
+                 <div className="flex justify-between items-center mb-8">
+                    <h2 className="text-3xl font-bold text-gray-800">Gerenciar Aluguéis</h2>
+                    <button onClick={() => openModal('rental')} className="bg-blue-600 text-white font-bold py-2 px-4 rounded-lg flex items-center space-x-2 hover:bg-blue-700 transition-colors shadow-md">
+                        <PlusCircle size={20} /><span>Novo Aluguel</span>
+                    </button>
+                </div>
+                <div className="bg-white p-6 rounded-2xl shadow-lg mb-8">
+                     <h3 className="text-xl font-bold text-gray-800 mb-4 flex items-center"><ShoppingCart size={22} className="mr-2 text-green-500"/> Aluguéis Ativos</h3>
+                     <div className="overflow-x-auto">
+                        <table className="w-full text-left">
+                           <thead>
+                                <tr className="border-b-2 border-gray-100">
+                                    <th className="p-3 font-semibold text-gray-600">Produto</th><th className="p-3 font-semibold text-gray-600">Cliente</th><th className="p-3 font-semibold text-gray-600">Data de Início</th><th className="p-3 font-semibold text-gray-600">Diária</th><th className="p-3 font-semibold text-gray-600">Ações</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {activeRentals.map(rental => (
+                                    <tr key={rental.id} className="border-b border-gray-100 hover:bg-gray-50">
+                                        <td className="p-3">{rental.productName}</td><td className="p-3">{rental.clientName}</td><td className="p-3">{rental.startDate.toLocaleDateString('pt-BR')}</td><td className="p-3">{rental.dailyRate.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</td>
+                                        <td className="p-3">
+                                            <div className="flex items-center space-x-2">
+                                                <button onClick={() => handleCompleteRental(rental.id)} className="bg-green-100 text-green-700 px-3 py-1 rounded-full text-sm font-semibold hover:bg-green-200 flex items-center space-x-1"><CheckCircle size={16}/><span>Concluir</span></button>
+                                                <button onClick={() => handleDeleteRental(rental.id)} className="p-2 text-gray-500 hover:text-red-600 hover:bg-red-100 rounded-full" title="Excluir Aluguel"><Trash2 size={18}/></button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                ))}
+                                {activeRentals.length === 0 && (<tr><td colSpan="5" className="text-center p-4 text-gray-500">Nenhum aluguel ativo.</td></tr>)}
+                            </tbody>
+                        </table>
+                     </div>
+                </div>
+                 <div className="bg-white p-6 rounded-2xl shadow-lg">
+                     <h3 className="text-xl font-bold text-gray-800 mb-4 flex items-center"><CheckCircle size={22} className="mr-2 text-blue-500"/> Histórico de Concluídos</h3>
+                     <div className="overflow-x-auto">
+                        <table className="w-full text-left">
+                           <thead>
+                                <tr className="border-b-2 border-gray-100">
+                                    <th className="p-3 font-semibold text-gray-600">Produto</th><th className="p-3 font-semibold text-gray-600">Cliente</th><th className="p-3 font-semibold text-gray-600">Período</th><th className="p-3 font-semibold text-gray-600">Ações</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {completedRentals.map(rental => (
+                                    <tr key={rental.id} className="border-b border-gray-100 hover:bg-gray-50">
+                                        <td className="p-3">{rental.productName}</td><td className="p-3">{rental.clientName}</td><td className="p-3">{`${rental.startDate.toLocaleDateString('pt-BR')} - ${rental.endDate ? rental.endDate.toLocaleDateString('pt-BR') : '...'}`}</td>
+                                        <td className="p-3">
+                                            <button onClick={() => handleDeleteRental(rental.id)} className="p-2 text-gray-500 hover:text-red-600 hover:bg-red-100 rounded-full" title="Excluir Histórico"><Trash2 size={18}/></button>
+                                        </td>
+                                    </tr>
+                                ))}
+                                {completedRentals.length === 0 && (<tr><td colSpan="4" className="text-center p-4 text-gray-500">Nenhum aluguel concluído.</td></tr>)}
+                            </tbody>
+                        </table>
+                     </div>
+                </div>
+            </div>
+        )
+    }
+
+    const Form = ({ fields, onSubmit, initialData, onCancel }) => {
+        const [formData, setFormData] = useState({});
+        useEffect(() => { setFormData(initialData || fields.reduce((acc, field) => ({...acc, [field.name]: ''}), {})); }, [initialData, fields]);
+        const handleChange = (e) => { setFormData(prev => ({ ...prev, [e.target.name]: e.target.value })); };
+        const handleSubmit = (e) => { e.preventDefault(); onSubmit(formData); };
+        return (
+            <form onSubmit={handleSubmit} className="space-y-6">
+                {fields.map(field => (
+                    <div key={field.name}>
+                        <label htmlFor={field.name} className="block text-sm font-medium text-gray-700 mb-1">{field.label}</label>
+                        {field.type === 'select' ? (
+                             <select id={field.name} name={field.name} value={formData[field.name] || ''} onChange={handleChange} required className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500">
+                                <option value="" disabled>Selecione...</option>
+                                {field.options.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
+                            </select>
+                        ) : (
+                            <input type={field.type} id={field.name} name={field.name} value={formData[field.name] || ''} onChange={handleChange} placeholder={field.placeholder} required className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500" />
+                        )}
+                    </div>
+                ))}
+                <div className="flex justify-end space-x-4 pt-4">
+                    <button type="button" onClick={onCancel} className="bg-gray-200 text-gray-800 font-bold py-2 px-6 rounded-lg hover:bg-gray-300">Cancelar</button>
+                    <button type="submit" className="bg-blue-600 text-white font-bold py-2 px-6 rounded-lg hover:bg-blue-700 shadow-md">Salvar</button>
+                </div>
+            </form>
+        );
+    };
+
+    const renderView = () => {
+        switch (currentView) {
+            case 'products': return <GenericListView title="Produtos / Equipamentos" data={products} columns={[{ key: 'name', label: 'Nome' }, { key: 'dailyRate', label: 'Diária (R$)' }, { key: 'totalQuantity', label: 'Qtd. Total' }, { key: 'availableQuantity', label: 'Qtd. Disp.' }]} onAdd={() => openModal('product')} onEdit={(item) => openModal('product', item)} onDelete={handleDelete} collectionName="products" />;
+            case 'clients': return <GenericListView title="Clientes" data={clients} columns={[{ key: 'name', label: 'Nome' }, { key: 'phone', label: 'Telefone' }, { key: 'address', label: 'Endereço' }]} onAdd={() => openModal('client')} onEdit={(item) => openModal('client', item)} onDelete={handleDelete} collectionName="clients" />;
+            case 'rentals': return <RentalsView />;
+            default: return <DashboardView />;
+        }
+    };
+    
+    const NavItem = ({ icon, label, viewName }) => (
+        <li className="mb-2">
+            <button onClick={() => { setCurrentView(viewName); if (isSidebarOpen) setIsSidebarOpen(false); }} className={`w-full flex items-center p-3 rounded-lg transition-colors text-lg ${currentView === viewName ? 'bg-blue-600 text-white shadow-md' : 'text-gray-300 hover:bg-gray-700 hover:text-white'}`}>
+                {icon}<span className="ml-4">{label}</span>
+            </button>
+        </li>
+    );
+
+    if (!isAuthReady) {
+        return <div className="flex justify-center items-center h-screen bg-gray-900 text-white">Carregando Painel...</div>;
+    }
+
+    return (
+        <div className="flex h-screen bg-gray-100 font-sans">
+            <aside className={`bg-gray-800 text-white fixed lg:static inset-y-0 left-0 z-30 w-64 transform ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'} lg:translate-x-0 transition-transform duration-300 ease-in-out shadow-2xl`}>
+                <div className="p-6 flex items-center justify-between"><h1 className="text-2xl font-bold text-white">RentalSys</h1><button onClick={() => setIsSidebarOpen(false)} className="lg:hidden text-gray-400 hover:text-white"><X size={24} /></button></div>
+                <nav className="p-4">
+                    <ul>
+                        <NavItem icon={<Home size={22} />} label="Dashboard" viewName="dashboard" /><NavItem icon={<Package size={22} />} label="Produtos" viewName="products" /><NavItem icon={<Users size={22} />} label="Clientes" viewName="clients" /><NavItem icon={<ShoppingCart size={22} />} label="Aluguéis" viewName="rentals" />
+                    </ul>
+                </nav>
+                 <div className="absolute bottom-4 left-4 right-4 p-2 text-xs text-gray-400 break-words"><p className="font-semibold">ID do Usuário:</p><p className="text-gray-500">{userId}</p></div>
+            </aside>
+
+            <main className="flex-1 flex flex-col overflow-y-auto">
+                <header className="bg-white shadow-sm p-4 flex justify-between items-center lg:hidden"><h1 className="text-xl font-bold text-gray-800 capitalize">{currentView}</h1><button onClick={() => setIsSidebarOpen(true)} className="text-gray-600"><Menu size={28} /></button></header>
+                <div className="p-6 md:p-8 flex-1">{renderView()}</div>
+            </main>
+
+            {/* Modais de Formulário */}
+            <Modal isOpen={isClientModalOpen} onClose={closeAllModals} title={editingItem ? 'Editar Cliente' : 'Novo Cliente'}><Form initialData={editingItem} onSubmit={handleClientSubmit} onCancel={closeAllModals} fields={[{ name: 'name', label: 'Nome Completo', type: 'text', placeholder: 'João da Silva' }, { name: 'phone', label: 'Telefone', type: 'tel', placeholder: '(11) 99999-8888' }, { name: 'address', label: 'Endereço', type: 'text', placeholder: 'Rua das Flores, 123' }]} /></Modal>
+            <Modal isOpen={isProductModalOpen} onClose={closeAllModals} title={editingItem ? 'Editar Produto' : 'Novo Produto'}><Form initialData={editingItem} onSubmit={handleProductSubmit} onCancel={closeAllModals} fields={[{ name: 'name', label: 'Nome do Produto', type: 'text', placeholder: 'Betoneira 400L' }, { name: 'dailyRate', label: 'Valor da Diária (R$)', type: 'number', placeholder: '100.00' }, { name: 'totalQuantity', label: 'Quantidade Total', type: 'number', placeholder: '5' }]} /></Modal>
+            <Modal isOpen={isRentalModalOpen} onClose={closeAllModals} title="Criar Novo Aluguel"><Form onSubmit={handleRentalSubmit} onCancel={closeAllModals} fields={[{ name: 'clientId', label: 'Cliente', type: 'select', options: clients.map(c => ({ value: c.id, label: c.name })) }, { name: 'productId', label: 'Produto', type: 'select', options: products.filter(p => p.availableQuantity > 0).map(p => ({ value: p.id, label: `${p.name} (${p.availableQuantity} disp.)` })) }, { name: 'startDate', label: 'Data de Início', type: 'date' }]} /></Modal>
+            
+            {/* Modais de Alerta e Confirmação */}
+            <AlertModal isOpen={isAlertModalOpen} onClose={() => setIsAlertModalOpen(false)} message={alertMessage} />
+            <ConfirmModal isOpen={isConfirmModalOpen} onClose={closeConfirmModal} onConfirm={confirmModalProps.onConfirm} text={confirmModalProps.text} />
+        </div>
+    );
+}
